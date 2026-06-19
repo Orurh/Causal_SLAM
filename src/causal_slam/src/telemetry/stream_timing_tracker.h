@@ -6,7 +6,7 @@
 
 namespace causal_slam::telemetry {
 
-struct ImuTimingSample {
+struct TimingSample {
   std::int64_t header_stamp_ns{0};
   std::int64_t receive_time_ns{0};
 };
@@ -19,7 +19,7 @@ enum class TimingHealth {
 
 [[nodiscard]] const char* ToString(TimingHealth health);
 
-struct ImuTimingSummary {
+struct TimingSummary {
   std::uint64_t total_count{0};
   std::uint64_t window_count{0};
 
@@ -42,12 +42,14 @@ struct ImuTimingSummary {
   std::string reason{"ok"};
 };
 
-class ImuTimingTracker final {
+class StreamTimingTracker final {
  public:
-  void Observe(const ImuTimingSample& sample);
-  [[nodiscard]] ImuTimingSummary LifetimeSummary() const;
-  [[nodiscard]] ImuTimingSummary ConsumeWindowSummary();
- 
+  void Observe(const TimingSample& sample);
+  void SetGapThresholdMs(double threshold_ms);
+
+  [[nodiscard]] TimingSummary LifetimeSummary() const;
+  [[nodiscard]] TimingSummary ConsumeWindowSummary();
+
  private:
   void ResetWindow();
 
@@ -56,6 +58,8 @@ class ImuTimingTracker final {
   double last_delay_ms_{0.0};
   double delay_sum_ms_{0.0};
   double max_delay_ms_{0.0};
+
+  std::int64_t gap_threshold_ns_{100'000'000};
 
   std::optional<std::int64_t> previous_stamp_ns_;
   std::optional<std::int64_t> previous_period_ns_;

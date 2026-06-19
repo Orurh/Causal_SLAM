@@ -13,7 +13,9 @@ class FakeImuPublisherNode final : public rclcpp::Node {
  public:
   explicit FakeImuPublisherNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions{})
       : rclcpp::Node("fake_imu_publisher_node", options) {
-    imu_publisher_ = this->create_publisher<sensor_msgs::msg::Imu>("/imu/data", rclcpp::SensorDataQoS{});
+    const std::string imu_topic = this->declare_parameter<std::string>("imu_topic", "/imu/data");
+
+    imu_publisher_ = this->create_publisher<sensor_msgs::msg::Imu>(imu_topic, rclcpp::SensorDataQoS{});
 
     const double period_ms = this->declare_parameter<double>("period_ms", 10.0);
     const double safe_period_ms = std::max(period_ms, 1.0);
@@ -22,7 +24,7 @@ class FakeImuPublisherNode final : public rclcpp::Node {
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::duration<double, std::milli>(safe_period_ms)),
         [this]() { PublishImu(); });
 
-    RCLCPP_INFO(this->get_logger(), "FakeImuPublisherNode started | period_ms=%.3f", safe_period_ms);
+    RCLCPP_INFO(this->get_logger(), "FakeImuPublisherNode started | imu_topic=%s | period_ms=%.3f", imu_topic.c_str(), safe_period_ms);
   }
 
  private:

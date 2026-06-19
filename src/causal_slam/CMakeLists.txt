@@ -21,7 +21,7 @@ find_package(builtin_interfaces REQUIRED)
 add_executable(temporal_monitor_node
   src/nodes/temporal_monitor_main.cc
   src/nodes/temporal_monitor_node.cc
-  src/telemetry/imu_timing_tracker.cc
+  src/telemetry/stream_timing_tracker.cc
 )
 
 target_include_directories(temporal_monitor_node
@@ -33,7 +33,16 @@ add_executable(fake_imu_publisher_node
   src/nodes/fake_imu_publisher_node.cc
 )
 
+add_executable(fake_lidar_publisher_node
+  src/nodes/fake_lidar_publisher_node.cc
+)
+
 ament_target_dependencies(fake_imu_publisher_node
+  rclcpp
+  sensor_msgs
+)
+
+ament_target_dependencies(fake_lidar_publisher_node
   rclcpp
   sensor_msgs
 )
@@ -47,20 +56,33 @@ ament_target_dependencies(temporal_monitor_node
 
 install(TARGETS 
   temporal_monitor_node
-  fake_imu_publisher_node 
+  fake_imu_publisher_node
+  fake_lidar_publisher_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # comment the line when a copyright and license is added to all source files
-  set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # comment the line when this package is in a git repo and when
-  # a copyright and license is added to all source files
-  set(ament_cmake_cpplint_FOUND TRUE)
-  ament_lint_auto_find_test_dependencies()
+  find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(stream_timing_tracker_test
+    tests/telemetry/stream_timing_tracker_test.cc
+    src/telemetry/stream_timing_tracker.cc
+  )
+
+  target_include_directories(stream_timing_tracker_test
+    PRIVATE
+      src
+  )
+
+  # find_package(ament_lint_auto REQUIRED)
+  # # the following line skips the linter which checks for copyrights
+  # # comment the line when a copyright and license is added to all source files
+  # set(ament_cmake_copyright_FOUND TRUE)
+  # # the following line skips cpplint (only works in a git repo)
+  # # comment the line when this package is in a git repo and when
+  # # a copyright and license is added to all source files
+  # set(ament_cmake_cpplint_FOUND TRUE)
+  # ament_lint_auto_find_test_dependencies()
 endif()
 
 ament_package()

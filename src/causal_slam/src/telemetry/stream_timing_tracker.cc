@@ -1,43 +1,46 @@
-#include "imu_timing_tracker.h"
+#include "stream_timing_tracker.h"
 
 #include <algorithm>
 #include <cstdint>
+#include <utility>
 
 namespace causal_slam::telemetry {
 
 namespace {
-constexpr std::int64_t kLargeImuGapNs = 100'000'000;  // 100 ms
+
+constexpr double kMinGapThresholdMs = 1.0;
+constexpr double kNanosecondsPerMillisecond = 1'000'000.0;
 
 double NanosecondsToMilliseconds(const std::int64_t nanoseconds) {
-  return static_cast<double>(nanoseconds) / 1'000'000.0;
+  return static_cast<double>(nanoseconds) / kNanosecondsPerMillisecond;
 }
 
 std::int64_t AbsNanoseconds(const std::int64_t value) {
   return value < 0 ? -value : value;
 }
 
-ImuTimingSummary EvaluateHealth(ImuTimingSummary summary) {
+TimingSummary EvaluateHealth(TimingSummary summary) {
   if (summary.window_reordered_count > 0) {
     summary.health = TimingHealth::kDegraded;
-    summary.reason = "imu_message_reordering_detected";
+    summary.reason = "message_reordering_detected";
     return summary;
   }
 
   if (summary.window_gap_count > 0) {
     summary.health = TimingHealth::kDegraded;
-    summary.reason = "imu_stream_gap";
+    summary.reason = "stream_gap";
     return summary;
   }
 
   if (summary.window_max_jitter_ms > 10.0) {
     summary.health = TimingHealth::kDegraded;
-    summary.reason = "imu_jitter_high";
+    summary.reason = "jitter_high";
     return summary;
   }
 
   if (summary.window_max_jitter_ms > 2.0) {
     summary.health = TimingHealth::kWarning;
-    summary.reason = "imu_jitter_suspicious";
+    summary.reason = "jitter_suspicious";
     return summary;
   }
 
@@ -61,12 +64,18 @@ const char* ToString(const TimingHealth health) {
   return "UNKNOWN";
 }
 
-void ImuTimingTracker::Observe(const ImuTimingSample& sample) {
+void StreamTimingTracker::SetGapThresholdMs(const double threshold_ms) {
+  const double safe_threshold_ms = std::max(threshold_ms, kMinGapThresholdMs);
+  gap_threshold_ns_ = static_cast<std::int64_t>(safe_threshold_ms * kNanosecondsPerMillisecond);
+}
+
+void StreamTimingTracker::Observe(const TimingSample& sample) {
   const std::int64_t delay_ns = sample.receive_time_ns - sample.header_stamp_ns;
 
   last_delay_ms_ = NanosecondsToMilliseconds(delay_ns);
   delay_sum_ms_ += last_delay_ms_;
   max_delay_ms_ = std::max(max_delay_ms_, last_delay_ms_);
+
   window_delay_sum_ms_ += last_delay_ms_;
   window_max_delay_ms_ = std::max(window_max_delay_ms_, last_delay_ms_);
 
@@ -76,7 +85,7 @@ void ImuTimingTracker::Observe(const ImuTimingSample& sample) {
     if (period_ns < 0) {
       ++reordered_count_;
       ++window_reordered_count_;
-    } else if (period_ns > kLargeImuGapNs) {
+    } else if (period_ns > gap_threshold_ns_) {
       ++gap_count_;
       ++window_gap_count_;
 
@@ -104,10 +113,10 @@ void ImuTimingTracker::Observe(const ImuTimingSample& sample) {
   ++window_count_;
 }
 
-ImuTimingSummary ImuTimingTracker::LifetimeSummary() const {
+TimingSummary StreamTimingTracker::LifetimeSummary() const {
   const double average_delay_ms = count_ > 0 ? delay_sum_ms_ / static_cast<double>(count_) : 0.0;
 
-  auto summary = ImuTimingSummary{
+  auto summary = TimingSummary{
       .total_count = count_,
       .window_count = count_,
       .last_delay_ms = last_delay_ms_,
@@ -122,13 +131,15 @@ ImuTimingSummary ImuTimingTracker::LifetimeSummary() const {
       .window_gap_count = gap_count_,
       .max_gap_ms = max_gap_ms_,
   };
+
   return EvaluateHealth(std::move(summary));
 }
 
-ImuTimingSummary ImuTimingTracker::ConsumeWindowSummary() {
-  const double window_average_delay_ms = window_count_ > 0 ? window_delay_sum_ms_ / static_cast<double>(window_count_) : 0.0;
+TimingSummary StreamTimingTracker::ConsumeWindowSummary() {
+  const double window_average_delay_ms =
+      window_count_ > 0 ? window_delay_sum_ms_ / static_cast<double>(window_count_) : 0.0;
 
-  auto summary = ImuTimingSummary{
+  auto summary = TimingSummary{
       .total_count = count_,
       .window_count = window_count_,
       .last_delay_ms = last_delay_ms_,
@@ -149,7 +160,7 @@ ImuTimingSummary ImuTimingTracker::ConsumeWindowSummary() {
   return summary;
 }
 
-void ImuTimingTracker::ResetWindow() {
+void StreamTimingTracker::ResetWindow() {
   window_count_ = 0;
   window_delay_sum_ms_ = 0.0;
   window_max_delay_ms_ = 0.0;

@@ -1,0 +1,185 @@
+#include "diagnostics/temporal_diagnostics.h"
+
+#include <algorithm>
+#include <string>
+
+#include <gtest/gtest.h>
+
+namespace causal_slam::diagnostics {
+namespace {
+
+namespace coverage = causal_slam::coverage;
+namespace lidar = causal_slam::lidar;
+namespace telemetry = causal_slam::telemetry;
+
+telemetry::TimingSummary OkTiming() {
+  telemetry::TimingSummary summary;
+  summary.window_count = 10;
+  summary.health = telemetry::TimingHealth::kOk;
+  summary.reason = "ok";
+  return summary;
+}
+
+coverage::ImuCoverageSummary OkCoverage() {
+  coverage::ImuCoverageSummary summary;
+  summary.imu_count_in_window = 5;
+  summary.coverage_ratio = 0.8;
+  summary.max_gap_inside_ms = 20.0;
+  summary.health = coverage::ImuCoverageHealth::kOk;
+  summary.reason = "ok";
+  return summary;
+}
+
+coverage::ImuCoverageSummary DegradedCoverage() {
+  coverage::ImuCoverageSummary summary;
+  summary.imu_count_in_window = 0;
+  summary.coverage_ratio = 0.0;
+  summary.missing_prefix_ms = 100.0;
+  summary.missing_suffix_ms = 100.0;
+  summary.max_gap_inside_ms = 0.0;
+  summary.health = coverage::ImuCoverageHealth::kDegraded;
+  summary.reason = "imu_window_empty";
+  return summary;
+}
+
+lidar::LidarScanWindowEstimate HighConfidencePointTimeWindow() {
+  lidar::LidarScanWindowEstimate estimate;
+  estimate.duration_ms = 100.0;
+  estimate.source = lidar::LidarScanWindowSource::kPointTimeField;
+  estimate.confidence = lidar::LidarScanWindowConfidence::kHigh;
+  estimate.reason = "point_time_field_extracted:relative_nanoseconds";
+  return estimate;
+}
+
+lidar::LidarScanWindowEstimate MediumConfidenceMeasuredWindow() {
+  lidar::LidarScanWindowEstimate estimate;
+  estimate.duration_ms = 100.0;
+  estimate.source = lidar::LidarScanWindowSource::kMeasuredHeaderPeriod;
+  estimate.confidence = lidar::LidarScanWindowConfidence::kMedium;
+  estimate.reason = "measured_header_period";
+  return estimate;
+}
+
+lidar::LidarScanWindowEstimate LowConfidenceFallbackWindow() {
+  lidar::LidarScanWindowEstimate estimate;
+  estimate.duration_ms = 100.0;
+  estimate.source = lidar::LidarScanWindowSource::kAssumedFixedDuration;
+  estimate.confidence = lidar::LidarScanWindowConfidence::kLow;
+  estimate.reason = "no_previous_lidar_stamp";
+  return estimate;
+}
+
+PointTimeDiagnostics SupportedOffsetTime() {
+  PointTimeDiagnostics diagnostics;
+  diagnostics.has_time_candidate = true;
+  diagnostics.has_supported_time_field = true;
+  diagnostics.field_name = "offset_time";
+  diagnostics.field_datatype = "UINT32";
+  diagnostics.field_role = "point_offset_time";
+  diagnostics.inspection_reason = "supported_point_time_field_detected";
+  diagnostics.extraction_attempted = true;
+  diagnostics.extraction_used = true;
+  diagnostics.extraction_reason = "point_time_field_extracted";
+  diagnostics.extraction_unit = "relative_nanoseconds";
+  return diagnostics;
+}
+
+PointTimeDiagnostics RejectedFloat32Timestamp() {
+  PointTimeDiagnostics diagnostics;
+  diagnostics.has_time_candidate = true;
+  diagnostics.has_supported_time_field = false;
+  diagnostics.field_name = "timestamp";
+  diagnostics.field_datatype = "FLOAT32";
+  diagnostics.field_role = "point_time";
+  diagnostics.inspection_reason =
+      "absolute_float32_timestamp_precision_unsafe";
+  return diagnostics;
+}
+
+TemporalDiagnosticsInput BaseOkInput() {
+  TemporalDiagnosticsInput input;
+  input.imu_timing = OkTiming();
+  input.lidar_timing = OkTiming();
+  input.has_imu_coverage = true;
+  input.imu_coverage = OkCoverage();
+  input.lidar_scan_window = HighConfidencePointTimeWindow();
+  input.lidar_point_time = SupportedOffsetTime();
+  input.imu_buffer_size = 250;
+  return input;
+}
+
+bool HasIssueWithTitle(const TemporalDiagnosticSnapshot& snapshot,
+                       const std::string& title) {
+  return std::ranges::any_of(snapshot.issues, [&](const auto& issue) {
+    return issue.title == title;
+  });
+}
+
+TEST(TemporalDiagnosticsBuilderTest,
+     SupportedPointTimeAndOkCoverageProducesOkSnapshot) {
+  const TemporalDiagnosticsBuilder builder;
+
+  const auto snapshot = builder.Build(BaseOkInput());
+
+  EXPECT_EQ(snapshot.overall_status, TemporalHealthStatus::kOk);
+  EXPECT_TRUE(snapshot.issues.empty());
+}
+
+TEST(TemporalDiagnosticsBuilderTest,
+     RejectedFloat32TimestampProducesWarning) {
+  auto input = BaseOkInput();
+  input.lidar_scan_window = MediumConfidenceMeasuredWindow();
+  input.lidar_point_time = RejectedFloat32Timestamp();
+
+  const TemporalDiagnosticsBuilder builder;
+  const auto snapshot = builder.Build(input);
+
+  EXPECT_EQ(snapshot.overall_status, TemporalHealthStatus::kWarning);
+  EXPECT_TRUE(HasIssueWithTitle(
+      snapshot, "LiDAR point timestamps were detected but not trusted"));
+}
+
+TEST(TemporalDiagnosticsBuilderTest,
+     MeasuredHeaderPeriodWithoutPointTimeCandidateIsOk) {
+  auto input = BaseOkInput();
+  input.lidar_scan_window = MediumConfidenceMeasuredWindow();
+
+  PointTimeDiagnostics no_point_time;
+  no_point_time.has_time_candidate = false;
+  no_point_time.has_supported_time_field = false;
+  no_point_time.inspection_reason = "no_time_field_candidate";
+  input.lidar_point_time = no_point_time;
+
+  const TemporalDiagnosticsBuilder builder;
+  const auto snapshot = builder.Build(input);
+
+  EXPECT_EQ(snapshot.overall_status, TemporalHealthStatus::kOk);
+  EXPECT_TRUE(snapshot.issues.empty());
+}
+
+TEST(TemporalDiagnosticsBuilderTest, LowConfidenceScanWindowProducesWarning) {
+  auto input = BaseOkInput();
+  input.lidar_scan_window = LowConfidenceFallbackWindow();
+
+  const TemporalDiagnosticsBuilder builder;
+  const auto snapshot = builder.Build(input);
+
+  EXPECT_EQ(snapshot.overall_status, TemporalHealthStatus::kWarning);
+  EXPECT_TRUE(HasIssueWithTitle(
+      snapshot, "LiDAR scan window has low confidence"));
+}
+
+TEST(TemporalDiagnosticsBuilderTest, DegradedImuCoverageProducesDegraded) {
+  auto input = BaseOkInput();
+  input.imu_coverage = DegradedCoverage();
+
+  const TemporalDiagnosticsBuilder builder;
+  const auto snapshot = builder.Build(input);
+
+  EXPECT_EQ(snapshot.overall_status, TemporalHealthStatus::kDegraded);
+  EXPECT_TRUE(HasIssueWithTitle(
+      snapshot, "IMU does not properly cover the LiDAR scan window"));
+}
+
+}  // namespace
+}  // namespace causal_slam::diagnostics

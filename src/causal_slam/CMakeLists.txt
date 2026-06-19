@@ -25,6 +25,9 @@ set(CAUSAL_SLAM_CORE_SOURCES
 
   src/coverage/imu_coverage_analyzer.cc
   src/coverage/imu_sample_buffer.cc
+
+  src/diagnostics/temporal_diagnostics.cc
+  src/render/console_temporal_summary_renderer.cc
 )
 
 add_library(causal_slam_core STATIC
@@ -134,6 +137,10 @@ if(BUILD_TESTING)
     tests/coverage/imu_sample_buffer_test.cc
   )
 
+  add_causal_slam_gtest(temporal_diagnostics_test
+    tests/diagnostics/temporal_diagnostics_test.cc
+  )
+
   ament_add_gtest(point_cloud2_field_inspector_test
     tests/ros_adapters/point_cloud2_field_inspector_test.cc
   )
@@ -161,7 +168,6 @@ if(BUILD_TESTING)
       sensor_msgs
     )
   endif()
-
 
   # find_package(ament_lint_auto REQUIRED)
   # set(ament_cmake_copyright_FOUND TRUE)

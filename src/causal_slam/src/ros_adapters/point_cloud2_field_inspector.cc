@@ -167,11 +167,6 @@ PointCloud2FieldInspection PointCloud2FieldInspector::Inspect(const sensor_msgs:
     return inspection;
   }
 
-  if (has_split_time_second && has_split_time_nanosecond) {
-    inspection.reason = "split_time_fields_detected_not_supported_yet";
-    return inspection;
-  }
-
   if (has_unsupported_simple_time_field) {
     inspection.reason = "unsupported_time_field_datatype";
     return inspection;

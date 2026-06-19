@@ -1,0 +1,13 @@
+build/
+install/
+log/
+
+.vscode/
+.idea/
+
+*.swp
+*.swo
+*~
+.clang-format
+.clang-tidy
+compile_commands.json

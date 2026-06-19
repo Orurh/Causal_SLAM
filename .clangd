@@ -1,0 +1,11 @@
+CompileFlags:
+  CompilationDatabase: build
+  Add:
+    - -I/opt/ros/jazzy/include
+    - --std=c++23
+  Remove:
+    - -fcolor-diagnostics
+    - -fdiagnostics-color
+
+Index:
+  Background: Build

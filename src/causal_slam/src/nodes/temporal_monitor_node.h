@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include <rclcpp/rclcpp.hpp>
 
 #include <sensor_msgs/msg/imu.hpp>
@@ -10,6 +12,7 @@
 #include "lidar/lidar_scan_window_estimator.h"
 #include "ros_adapters/point_cloud2_field_inspector.h"
 #include "telemetry/stream_timing_tracker.h"
+#include "ros_adapters/point_cloud2_time_field_extractor.h"
 
 namespace causal_slam::nodes {
 
@@ -40,6 +43,8 @@ class TemporalMonitorNode final : public rclcpp::Node {
   bool has_lidar_coverage_summary_{false};
 
   causal_slam::ros_adapters::PointCloud2FieldInspector point_cloud2_field_inspector_;
+  causal_slam::ros_adapters::PointCloud2TimeFieldExtractor point_cloud2_time_field_extractor_;
+  std::optional<causal_slam::ros_adapters::PointCloud2FieldInfo> lidar_point_time_field_;
   bool has_logged_lidar_point_cloud2_fields_{false};
 };
 

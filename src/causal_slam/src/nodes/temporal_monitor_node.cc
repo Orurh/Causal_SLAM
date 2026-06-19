@@ -46,6 +46,23 @@ std::int64_t MillisecondsToNanoseconds(double milliseconds) {
   return static_cast<std::int64_t>(safe_milliseconds * kNanosecondsPerMillisecond);
 }
 
+double NanosecondsToMilliseconds(std::int64_t nanoseconds) {
+  constexpr double kNanosecondsPerMillisecond = 1'000'000.0;
+
+  return static_cast<double>(nanoseconds) / kNanosecondsPerMillisecond;
+}
+
+causal_slam::lidar::LidarScanWindowEstimate BuildPointTimeFieldEstimate(
+    const causal_slam::ros_adapters::PointCloud2TimeFieldExtraction& extraction) {
+  return causal_slam::lidar::LidarScanWindowEstimate{
+      .window = extraction.scan_window,
+      .duration_ms = NanosecondsToMilliseconds(extraction.scan_window.DurationNs()),
+      .source = causal_slam::lidar::LidarScanWindowSource::kPointTimeField,
+      .confidence = causal_slam::lidar::LidarScanWindowConfidence::kHigh,
+      .reason = extraction.reason + ":" + causal_slam::ros_adapters::ToString(extraction.time_unit),
+  };
+}
+
 void LogImuCoverageSummary(const rclcpp::Logger& logger, bool has_summary, const causal_slam::coverage::ImuCoverageSummary& summary,
                            const causal_slam::lidar::LidarScanWindowEstimate& scan_window_estimate, std::size_t imu_buffer_size) {
   if (!has_summary) {
@@ -205,11 +222,18 @@ void TemporalMonitorNode::OnImuReceived(sensor_msgs::msg::Imu::ConstSharedPtr ms
 
 void TemporalMonitorNode::OnLidarReceived(sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
   const std::int64_t stamp_ns = rclcpp::Time(msg->header.stamp).nanoseconds();
+
   if (!has_logged_lidar_point_cloud2_fields_) {
     const auto inspection = point_cloud2_field_inspector_.Inspect(*msg);
     LogPointCloud2FieldInspection(this->get_logger(), inspection);
+
+    if (inspection.primary_time_field.has_value()) {
+      lidar_point_time_field_ = *inspection.primary_time_field;
+    }
+
     has_logged_lidar_point_cloud2_fields_ = true;
   }
+
   lidar_timing_tracker_.Observe(causal_slam::telemetry::TimingSample{
       .header_stamp_ns = stamp_ns,
       .receive_time_ns = this->now().nanoseconds(),
@@ -217,7 +241,18 @@ void TemporalMonitorNode::OnLidarReceived(sensor_msgs::msg::PointCloud2::ConstSh
 
   latest_lidar_scan_window_estimate_ = lidar_scan_window_estimator_.Estimate(stamp_ns);
 
-  latest_imu_coverage_summary_ = imu_coverage_analyzer_.Analyze(latest_lidar_scan_window_estimate_.window, imu_sample_buffer_.Samples());
+  if (lidar_point_time_field_.has_value()) {
+    const auto extraction =
+        point_cloud2_time_field_extractor_.Extract(*msg, *lidar_point_time_field_);
+
+    if (extraction.has_scan_window) {
+      latest_lidar_scan_window_estimate_ = BuildPointTimeFieldEstimate(extraction);
+    }
+  }
+
+  latest_imu_coverage_summary_ =
+      imu_coverage_analyzer_.Analyze(latest_lidar_scan_window_estimate_.window,
+                                     imu_sample_buffer_.Samples());
 
   has_lidar_coverage_summary_ = true;
 }

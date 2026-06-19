@@ -11,28 +11,37 @@ namespace causal_slam::ros_adapters {
 namespace {
 
 std::string ToLower(std::string value) {
-  std::ranges::transform(value, value.begin(), [](unsigned char ch) {
-    return static_cast<char>(std::tolower(ch));
-  });
+  std::ranges::transform(value, value.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
 
   return value;
 }
 
-bool IsSupportedSimpleTimeDatatype(std::uint8_t datatype) {
-  switch (datatype) {
-    case sensor_msgs::msg::PointField::FLOAT32:
-    case sensor_msgs::msg::PointField::FLOAT64:
-    case sensor_msgs::msg::PointField::INT32:
-    case sensor_msgs::msg::PointField::UINT32:
-      return true;
-    default:
-      return false;
+bool IsAbsoluteFloat32Timestamp(const PointCloud2FieldInfo& field_info) {
+  return field_info.time_role == PointCloud2TimeFieldRole::kPointTime && field_info.datatype == sensor_msgs::msg::PointField::FLOAT32;
+}
+
+bool IsSupportedTimeField(const PointCloud2FieldInfo& field_info) {
+  if (field_info.time_role == PointCloud2TimeFieldRole::kPointTime) {
+    return field_info.datatype == sensor_msgs::msg::PointField::FLOAT64;
   }
+
+  if (field_info.time_role == PointCloud2TimeFieldRole::kPointOffsetTime) {
+    switch (field_info.datatype) {
+      case sensor_msgs::msg::PointField::FLOAT32:
+      case sensor_msgs::msg::PointField::FLOAT64:
+      case sensor_msgs::msg::PointField::INT32:
+      case sensor_msgs::msg::PointField::UINT32:
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  return false;
 }
 
 bool IsSimpleTimeRole(PointCloud2TimeFieldRole role) {
-  return role == PointCloud2TimeFieldRole::kPointTime ||
-         role == PointCloud2TimeFieldRole::kPointOffsetTime;
+  return role == PointCloud2TimeFieldRole::kPointTime || role == PointCloud2TimeFieldRole::kPointOffsetTime;
 }
 
 PointCloud2TimeFieldRole DetectTimeFieldRole(const std::string& field_name) {
@@ -50,8 +59,7 @@ PointCloud2TimeFieldRole DetectTimeFieldRole(const std::string& field_name) {
     return PointCloud2TimeFieldRole::kSplitTimeSecond;
   }
 
-  if (name == "timenanosecond" || name == "time_nanosecond" ||
-      name == "time_ns") {
+  if (name == "timenanosecond" || name == "time_nanosecond" || name == "time_ns") {
     return PointCloud2TimeFieldRole::kSplitTimeNanosecond;
   }
 
@@ -100,13 +108,13 @@ const char* PointCloud2DatatypeToString(std::uint8_t datatype) {
   }
 }
 
-PointCloud2FieldInspection PointCloud2FieldInspector::Inspect(
-    const sensor_msgs::msg::PointCloud2& cloud) const {
+PointCloud2FieldInspection PointCloud2FieldInspector::Inspect(const sensor_msgs::msg::PointCloud2& cloud) const {
   PointCloud2FieldInspection inspection;
   inspection.fields.reserve(cloud.fields.size());
 
   bool has_split_time_second = false;
   bool has_split_time_nanosecond = false;
+  bool has_unsafe_absolute_float32_timestamp = false;
   bool has_unsupported_simple_time_field = false;
 
   for (const auto& field : cloud.fields) {
@@ -126,14 +134,14 @@ PointCloud2FieldInspection PointCloud2FieldInspector::Inspect(
       has_split_time_second = true;
     }
 
-    if (field_info.time_role ==
-        PointCloud2TimeFieldRole::kSplitTimeNanosecond) {
+    if (field_info.time_role == PointCloud2TimeFieldRole::kSplitTimeNanosecond) {
       has_split_time_nanosecond = true;
     }
 
-    if (!inspection.primary_time_field.has_value() &&
-        IsSimpleTimeRole(field_info.time_role)) {
-      if (IsSupportedSimpleTimeDatatype(field_info.datatype)) {
+    if (!inspection.primary_time_field.has_value() && IsSimpleTimeRole(field_info.time_role)) {
+      if (IsAbsoluteFloat32Timestamp(field_info)) {
+        has_unsafe_absolute_float32_timestamp = true;
+      } else if (IsSupportedTimeField(field_info)) {
         inspection.has_supported_time_field = true;
         inspection.primary_time_field = field_info;
       } else {
@@ -146,6 +154,16 @@ PointCloud2FieldInspection PointCloud2FieldInspector::Inspect(
 
   if (inspection.primary_time_field.has_value()) {
     inspection.reason = "supported_point_time_field_detected";
+    return inspection;
+  }
+
+  if (has_unsafe_absolute_float32_timestamp) {
+    inspection.reason = "absolute_float32_timestamp_precision_unsafe";
+    return inspection;
+  }
+
+  if (has_split_time_second && has_split_time_nanosecond) {
+    inspection.reason = "split_time_fields_detected_not_supported_yet";
     return inspection;
   }
 

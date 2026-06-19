@@ -16,10 +16,8 @@ namespace {
 constexpr std::int64_t kNanosecondsPerSecond = 1'000'000'000LL;
 constexpr double kNanosecondsPerSecondDouble = 1'000'000'000.0;
 
-std::int64_t HeaderStampToNanoseconds(
-    const builtin_interfaces::msg::Time& stamp) {
-  return static_cast<std::int64_t>(stamp.sec) * kNanosecondsPerSecond +
-         static_cast<std::int64_t>(stamp.nanosec);
+std::int64_t HeaderStampToNanoseconds(const builtin_interfaces::msg::Time& stamp) {
+  return static_cast<std::int64_t>(stamp.sec) * kNanosecondsPerSecond + static_cast<std::int64_t>(stamp.nanosec);
 }
 
 std::optional<std::int64_t> SecondsToNanoseconds(double seconds) {
@@ -27,26 +25,19 @@ std::optional<std::int64_t> SecondsToNanoseconds(double seconds) {
     return std::nullopt;
   }
 
-  constexpr double max_seconds =
-      static_cast<double>(std::numeric_limits<std::int64_t>::max()) /
-      kNanosecondsPerSecondDouble;
+  constexpr double max_seconds = static_cast<double>(std::numeric_limits<std::int64_t>::max()) / kNanosecondsPerSecondDouble;
 
-  constexpr double min_seconds =
-      static_cast<double>(std::numeric_limits<std::int64_t>::min()) /
-      kNanosecondsPerSecondDouble;
+  constexpr double min_seconds = static_cast<double>(std::numeric_limits<std::int64_t>::min()) / kNanosecondsPerSecondDouble;
 
   if (seconds > max_seconds || seconds < min_seconds) {
     return std::nullopt;
   }
 
-  return static_cast<std::int64_t>(
-      std::llround(seconds * kNanosecondsPerSecondDouble));
+  return static_cast<std::int64_t>(std::llround(seconds * kNanosecondsPerSecondDouble));
 }
 
 std::uint32_t PointCount(const sensor_msgs::msg::PointCloud2& cloud) {
-  const std::uint64_t point_count =
-      static_cast<std::uint64_t>(cloud.width) *
-      static_cast<std::uint64_t>(cloud.height);
+  const std::uint64_t point_count = static_cast<std::uint64_t>(cloud.width) * static_cast<std::uint64_t>(cloud.height);
 
   if (point_count > std::numeric_limits<std::uint32_t>::max()) {
     return std::numeric_limits<std::uint32_t>::max();
@@ -55,86 +46,65 @@ std::uint32_t PointCount(const sensor_msgs::msg::PointCloud2& cloud) {
   return static_cast<std::uint32_t>(point_count);
 }
 
-bool HasEnoughData(const sensor_msgs::msg::PointCloud2& cloud,
-                   std::uint32_t point_count) {
+bool HasEnoughData(const sensor_msgs::msg::PointCloud2& cloud, std::uint32_t point_count) {
   if (point_count == 0) {
     return true;
   }
 
-  const std::size_t required_size =
-      static_cast<std::size_t>(point_count) *
-      static_cast<std::size_t>(cloud.point_step);
+  const std::size_t required_size = static_cast<std::size_t>(point_count) * static_cast<std::size_t>(cloud.point_step);
 
   return cloud.data.size() >= required_size;
 }
 
 template <typename T>
-T ReadScalarUnchecked(const sensor_msgs::msg::PointCloud2& cloud,
-                      std::uint32_t point_index,
-                      std::uint32_t field_offset) {
+T ReadScalarUnchecked(const sensor_msgs::msg::PointCloud2& cloud, std::uint32_t point_index, std::uint32_t field_offset) {
   const std::size_t byte_offset =
-      static_cast<std::size_t>(point_index) *
-          static_cast<std::size_t>(cloud.point_step) +
-      static_cast<std::size_t>(field_offset);
+      static_cast<std::size_t>(point_index) * static_cast<std::size_t>(cloud.point_step) + static_cast<std::size_t>(field_offset);
 
   T value{};
   std::memcpy(&value, cloud.data.data() + byte_offset, sizeof(T));
   return value;
 }
 
-bool FieldFitsPointStep(const PointCloud2FieldInfo& time_field,
-                        std::uint32_t point_step,
-                        std::size_t value_size) {
-  return static_cast<std::size_t>(time_field.offset) + value_size <=
-         static_cast<std::size_t>(point_step);
+bool FieldFitsPointStep(const PointCloud2FieldInfo& time_field, std::uint32_t point_step, std::size_t value_size) {
+  return static_cast<std::size_t>(time_field.offset) + value_size <= static_cast<std::size_t>(point_step);
 }
 
-std::optional<std::int64_t> ReadAbsolutePointTimeNs(
-    const sensor_msgs::msg::PointCloud2& cloud,
-    const PointCloud2FieldInfo& time_field,
-    std::uint32_t point_index) {
+std::optional<std::int64_t> ReadAbsolutePointTimeNs(const sensor_msgs::msg::PointCloud2& cloud, const PointCloud2FieldInfo& time_field,
+                                                    std::uint32_t point_index) {
   switch (time_field.datatype) {
     case sensor_msgs::msg::PointField::FLOAT64:
-      return SecondsToNanoseconds(
-          ReadScalarUnchecked<double>(cloud, point_index, time_field.offset));
+      return SecondsToNanoseconds(ReadScalarUnchecked<double>(cloud, point_index, time_field.offset));
 
     case sensor_msgs::msg::PointField::FLOAT32:
-      return SecondsToNanoseconds(static_cast<double>(
-          ReadScalarUnchecked<float>(cloud, point_index, time_field.offset)));
+      return SecondsToNanoseconds(static_cast<double>(ReadScalarUnchecked<float>(cloud, point_index, time_field.offset)));
 
     default:
       return std::nullopt;
   }
 }
 
-std::optional<std::int64_t> ReadRelativeOffsetNs(
-    const sensor_msgs::msg::PointCloud2& cloud,
-    const PointCloud2FieldInfo& time_field,
-    std::uint32_t point_index) {
+std::optional<std::int64_t> ReadRelativeOffsetNs(const sensor_msgs::msg::PointCloud2& cloud, const PointCloud2FieldInfo& time_field,
+                                                 std::uint32_t point_index) {
   switch (time_field.datatype) {
     case sensor_msgs::msg::PointField::UINT32:
-      return static_cast<std::int64_t>(ReadScalarUnchecked<std::uint32_t>(
-          cloud, point_index, time_field.offset));
+      return static_cast<std::int64_t>(ReadScalarUnchecked<std::uint32_t>(cloud, point_index, time_field.offset));
 
     case sensor_msgs::msg::PointField::INT32:
-      return static_cast<std::int64_t>(ReadScalarUnchecked<std::int32_t>(
-          cloud, point_index, time_field.offset));
+      return static_cast<std::int64_t>(ReadScalarUnchecked<std::int32_t>(cloud, point_index, time_field.offset));
 
     case sensor_msgs::msg::PointField::FLOAT64:
-      return SecondsToNanoseconds(
-          ReadScalarUnchecked<double>(cloud, point_index, time_field.offset));
+      return SecondsToNanoseconds(ReadScalarUnchecked<double>(cloud, point_index, time_field.offset));
 
     case sensor_msgs::msg::PointField::FLOAT32:
-      return SecondsToNanoseconds(static_cast<double>(
-          ReadScalarUnchecked<float>(cloud, point_index, time_field.offset)));
+      return SecondsToNanoseconds(static_cast<double>(ReadScalarUnchecked<float>(cloud, point_index, time_field.offset)));
 
     default:
       return std::nullopt;
   }
 }
 
-std::optional<std::size_t> TimeFieldValueSize(
-    const PointCloud2FieldInfo& time_field) {
+std::optional<std::size_t> TimeFieldValueSize(const PointCloud2FieldInfo& time_field) {
   switch (time_field.datatype) {
     case sensor_msgs::msg::PointField::FLOAT64:
       return sizeof(double);
@@ -189,17 +159,20 @@ const char* ToString(PointCloud2TimeFieldUnit unit) {
   return "unknown";
 }
 
-PointCloud2TimeFieldExtraction PointCloud2TimeFieldExtractor::Extract(
-    const sensor_msgs::msg::PointCloud2& cloud,
-    const PointCloud2FieldInfo& time_field) const {
+PointCloud2TimeFieldExtraction PointCloud2TimeFieldExtractor::Extract(const sensor_msgs::msg::PointCloud2& cloud,
+                                                                      const PointCloud2FieldInfo& time_field) const {
   PointCloud2TimeFieldExtraction extraction;
   extraction.time_role = time_field.time_role;
   extraction.time_unit = UnitForField(time_field);
   extraction.point_count_total = PointCount(cloud);
 
-  if (time_field.time_role != PointCloud2TimeFieldRole::kPointTime &&
-      time_field.time_role != PointCloud2TimeFieldRole::kPointOffsetTime) {
+  if (time_field.time_role != PointCloud2TimeFieldRole::kPointTime && time_field.time_role != PointCloud2TimeFieldRole::kPointOffsetTime) {
     extraction.reason = "unsupported_time_field_role";
+    return extraction;
+  }
+
+  if (time_field.time_role == PointCloud2TimeFieldRole::kPointTime && time_field.datatype == sensor_msgs::msg::PointField::FLOAT32) {
+    extraction.reason = "absolute_float32_timestamp_precision_unsafe";
     return extraction;
   }
 
@@ -234,16 +207,13 @@ PointCloud2TimeFieldExtraction PointCloud2TimeFieldExtractor::Extract(
   std::vector<std::int64_t> point_times_ns;
   point_times_ns.reserve(extraction.point_count_total);
 
-  for (std::uint32_t point_index = 0; point_index < extraction.point_count_total;
-       ++point_index) {
+  for (std::uint32_t point_index = 0; point_index < extraction.point_count_total; ++point_index) {
     std::optional<std::int64_t> point_time_ns;
 
     if (time_field.time_role == PointCloud2TimeFieldRole::kPointTime) {
       point_time_ns = ReadAbsolutePointTimeNs(cloud, time_field, point_index);
-    } else if (time_field.time_role ==
-               PointCloud2TimeFieldRole::kPointOffsetTime) {
-      const std::optional<std::int64_t> offset_ns =
-          ReadRelativeOffsetNs(cloud, time_field, point_index);
+    } else if (time_field.time_role == PointCloud2TimeFieldRole::kPointOffsetTime) {
+      const std::optional<std::int64_t> offset_ns = ReadRelativeOffsetNs(cloud, time_field, point_index);
 
       if (offset_ns.has_value()) {
         point_time_ns = header_stamp_ns + *offset_ns;
@@ -255,16 +225,14 @@ PointCloud2TimeFieldExtraction PointCloud2TimeFieldExtractor::Extract(
     }
   }
 
-  extraction.point_count_used =
-      static_cast<std::uint32_t>(point_times_ns.size());
+  extraction.point_count_used = static_cast<std::uint32_t>(point_times_ns.size());
 
   if (point_times_ns.empty()) {
     extraction.reason = "no_valid_point_timestamps";
     return extraction;
   }
 
-  const auto [min_it, max_it] =
-      std::ranges::minmax_element(point_times_ns);
+  const auto [min_it, max_it] = std::ranges::minmax_element(point_times_ns);
 
   extraction.scan_window = causal_slam::core::TimeWindow{
       .start_ns = *min_it,
@@ -272,9 +240,7 @@ PointCloud2TimeFieldExtraction PointCloud2TimeFieldExtractor::Extract(
   };
 
   extraction.has_scan_window = extraction.scan_window.IsValid();
-  extraction.reason = extraction.has_scan_window
-                          ? "point_time_field_extracted"
-                          : "invalid_extracted_scan_window";
+  extraction.reason = extraction.has_scan_window ? "point_time_field_extracted" : "invalid_extracted_scan_window";
 
   return extraction;
 }

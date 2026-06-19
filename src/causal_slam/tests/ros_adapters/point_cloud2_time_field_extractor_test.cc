@@ -163,5 +163,48 @@ TEST(PointCloud2TimeFieldExtractorTest, FieldOutsidePointStepDoesNotExtractWindo
   EXPECT_EQ(result.reason, "time_field_exceeds_point_step");
 }
 
+TEST(PointCloud2FieldInspectorTest, RejectsTimestampFloat32AsUnsafeAbsoluteTime) {
+  sensor_msgs::msg::PointCloud2 cloud;
+  cloud.fields.push_back(Field("x", 0, sensor_msgs::msg::PointField::FLOAT32));
+  cloud.fields.push_back(
+      Field("timestamp", 12, sensor_msgs::msg::PointField::FLOAT32));
+
+  const PointCloud2FieldInspector inspector;
+  const auto inspection = inspector.Inspect(cloud);
+
+  EXPECT_TRUE(inspection.has_time_candidate);
+  EXPECT_FALSE(inspection.has_supported_time_field);
+  EXPECT_FALSE(inspection.primary_time_field.has_value());
+  EXPECT_EQ(inspection.reason, "absolute_float32_timestamp_precision_unsafe");
+}
+
+PointCloud2FieldInfo TimestampFloat32Field(std::uint32_t offset) {
+  return PointCloud2FieldInfo{
+      .name = "timestamp",
+      .offset = offset,
+      .datatype = sensor_msgs::msg::PointField::FLOAT32,
+      .count = 1,
+      .time_role = PointCloud2TimeFieldRole::kPointTime,
+  };
+}
+
+TEST(PointCloud2TimeFieldExtractorTest, RejectsAbsoluteTimestampFloat32AsUnsafe) {
+  sensor_msgs::msg::PointCloud2 cloud = MakeCloud(3, sizeof(float));
+  cloud.fields.push_back(
+      Field("timestamp", 0, sensor_msgs::msg::PointField::FLOAT32));
+
+  WriteValue<float>(cloud, 0, 0, 1781901358.0F);
+  WriteValue<float>(cloud, 1, 0, 1781901358.05F);
+  WriteValue<float>(cloud, 2, 0, 1781901358.10F);
+
+  const PointCloud2TimeFieldExtractor extractor;
+  const auto result = extractor.Extract(cloud, TimestampFloat32Field(0));
+
+  EXPECT_FALSE(result.has_scan_window);
+  EXPECT_EQ(result.point_count_total, 3U);
+  EXPECT_EQ(result.point_count_used, 0U);
+  EXPECT_EQ(result.reason, "absolute_float32_timestamp_precision_unsafe");
+}
+
 }  // namespace
 }  // namespace causal_slam::ros_adapters

@@ -8,6 +8,7 @@
 #include "coverage/imu_coverage_analyzer.h"
 #include "coverage/imu_sample_buffer.h"
 #include "lidar/lidar_scan_window_estimator.h"
+#include "ros_adapters/point_cloud2_field_inspector.h"
 #include "telemetry/stream_timing_tracker.h"
 
 namespace causal_slam::nodes {
@@ -37,6 +38,9 @@ class TemporalMonitorNode final : public rclcpp::Node {
 
   causal_slam::coverage::ImuCoverageSummary latest_imu_coverage_summary_;
   bool has_lidar_coverage_summary_{false};
+
+  causal_slam::ros_adapters::PointCloud2FieldInspector point_cloud2_field_inspector_;
+  bool has_logged_lidar_point_cloud2_fields_{false};
 };
 
 }  // namespace causal_slam::nodes

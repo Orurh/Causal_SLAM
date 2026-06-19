@@ -36,6 +36,24 @@ target_include_directories(causal_slam_core
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+set(CAUSAL_SLAM_ROS_ADAPTER_SOURCES
+  src/ros_adapters/point_cloud2_field_inspector.cc
+)
+
+add_library(causal_slam_ros_adapters STATIC
+  ${CAUSAL_SLAM_ROS_ADAPTER_SOURCES}
+)
+
+target_include_directories(causal_slam_ros_adapters
+  PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+ament_target_dependencies(causal_slam_ros_adapters
+  sensor_msgs
+)
+
+
 add_executable(temporal_monitor_node
   src/nodes/temporal_monitor_main.cc
   src/nodes/temporal_monitor_node.cc
@@ -43,6 +61,7 @@ add_executable(temporal_monitor_node
 
 target_link_libraries(temporal_monitor_node
   causal_slam_core
+  causal_slam_ros_adapters
 )
 
 ament_target_dependencies(temporal_monitor_node
@@ -109,6 +128,20 @@ if(BUILD_TESTING)
   add_causal_slam_gtest(imu_sample_buffer_test
     tests/coverage/imu_sample_buffer_test.cc
   )
+
+  ament_add_gtest(point_cloud2_field_inspector_test
+    tests/ros_adapters/point_cloud2_field_inspector_test.cc
+  )
+
+  if(TARGET point_cloud2_field_inspector_test)
+    target_link_libraries(point_cloud2_field_inspector_test
+      causal_slam_ros_adapters
+    )
+
+    ament_target_dependencies(point_cloud2_field_inspector_test
+      sensor_msgs
+    )
+  endif()
 
   # find_package(ament_lint_auto REQUIRED)
   # set(ament_cmake_copyright_FOUND TRUE)

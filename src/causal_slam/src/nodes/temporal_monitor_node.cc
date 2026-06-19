@@ -66,6 +66,39 @@ void LogImuCoverageSummary(const rclcpp::Logger& logger, bool has_summary, const
                              << " | scan_window_reason=" << scan_window_estimate.reason << " | imu_buffer_size=" << imu_buffer_size);
 }
 
+void LogPointCloud2FieldInspection(const rclcpp::Logger& logger, const causal_slam::ros_adapters::PointCloud2FieldInspection& inspection) {
+  std::ostringstream fields_stream;
+
+  for (std::size_t i = 0; i < inspection.fields.size(); ++i) {
+    const auto& field = inspection.fields[i];
+
+    if (i > 0) {
+      fields_stream << ", ";
+    }
+
+    fields_stream << field.name << ":" << causal_slam::ros_adapters::PointCloud2DatatypeToString(field.datatype)
+                  << "@offset=" << field.offset << ":count=" << field.count;
+
+    if (field.time_role != causal_slam::ros_adapters::PointCloud2TimeFieldRole::kNone) {
+      fields_stream << ":time_role=" << causal_slam::ros_adapters::ToString(field.time_role);
+    }
+  }
+
+  RCLCPP_INFO_STREAM(logger, "LiDAR PointCloud2 fields"
+                                 << " | field_count=" << inspection.fields.size()
+                                 << " | has_time_candidate=" << (inspection.has_time_candidate ? "true" : "false")
+                                 << " | has_supported_time_field=" << (inspection.has_supported_time_field ? "true" : "false")
+                                 << " | reason=" << inspection.reason << " | fields=[" << fields_stream.str() << "]");
+
+  if (inspection.primary_time_field.has_value()) {
+    const auto& field = *inspection.primary_time_field;
+    RCLCPP_INFO_STREAM(logger, "LiDAR PointCloud2 primary time field"
+                                   << " | name=" << field.name << " | datatype="
+                                   << causal_slam::ros_adapters::PointCloud2DatatypeToString(field.datatype) << " | offset=" << field.offset
+                                   << " | count=" << field.count << " | role=" << causal_slam::ros_adapters::ToString(field.time_role));
+  }
+}
+
 }  // namespace
 
 TemporalMonitorNode::TemporalMonitorNode(const rclcpp::NodeOptions& options) : rclcpp::Node("temporal_monitor_node", options) {
@@ -150,21 +183,11 @@ TemporalMonitorNode::TemporalMonitorNode(const rclcpp::NodeOptions& options) : r
               " | max_missing_prefix_ms=%.3f"
               " | max_missing_suffix_ms=%.3f"
               " | max_internal_gap_ms=%.3f",
-              imu_topic.c_str(),
-              lidar_topic.c_str(),
-              safe_summary_period_ms,
-              safe_imu_gap_threshold_ms,
-              safe_lidar_gap_threshold_ms,
-              safe_lidar_scan_duration_ms,
-              safe_lidar_min_measured_scan_duration_ms,
-              safe_lidar_max_measured_scan_duration_ms,
-              lidar_prefer_measured_header_period ? "true" : "false",
-              causal_slam::lidar::ToString(parsed_lidar_stamp_policy),
-              safe_expected_imu_period_ms,
-              safe_imu_buffer_retention_ms,
-              std::max(max_missing_prefix_ms, 0.0),
-              std::max(max_missing_suffix_ms, 0.0),
-              std::max(max_internal_gap_ms, safe_expected_imu_period_ms));
+              imu_topic.c_str(), lidar_topic.c_str(), safe_summary_period_ms, safe_imu_gap_threshold_ms, safe_lidar_gap_threshold_ms,
+              safe_lidar_scan_duration_ms, safe_lidar_min_measured_scan_duration_ms, safe_lidar_max_measured_scan_duration_ms,
+              lidar_prefer_measured_header_period ? "true" : "false", causal_slam::lidar::ToString(parsed_lidar_stamp_policy),
+              safe_expected_imu_period_ms, safe_imu_buffer_retention_ms, std::max(max_missing_prefix_ms, 0.0),
+              std::max(max_missing_suffix_ms, 0.0), std::max(max_internal_gap_ms, safe_expected_imu_period_ms));
 }
 
 void TemporalMonitorNode::OnImuReceived(sensor_msgs::msg::Imu::ConstSharedPtr msg) {
@@ -182,7 +205,11 @@ void TemporalMonitorNode::OnImuReceived(sensor_msgs::msg::Imu::ConstSharedPtr ms
 
 void TemporalMonitorNode::OnLidarReceived(sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
   const std::int64_t stamp_ns = rclcpp::Time(msg->header.stamp).nanoseconds();
-
+  if (!has_logged_lidar_point_cloud2_fields_) {
+    const auto inspection = point_cloud2_field_inspector_.Inspect(*msg);
+    LogPointCloud2FieldInspection(this->get_logger(), inspection);
+    has_logged_lidar_point_cloud2_fields_ = true;
+  }
   lidar_timing_tracker_.Observe(causal_slam::telemetry::TimingSample{
       .header_stamp_ns = stamp_ns,
       .receive_time_ns = this->now().nanoseconds(),

@@ -13,19 +13,19 @@ class FakeLidarPublisherNode final : public rclcpp::Node {
  public:
   explicit FakeLidarPublisherNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions{})
       : rclcpp::Node("fake_lidar_publisher_node", options) {
-    const std::string lidar_topic = this->declare_parameter<std::string>("lidar_topic", "/points");
+    const std::string kLidarTopic = this->declare_parameter<std::string>("lidar_topic", "/points");
 
-    lidar_publisher_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(lidar_topic, rclcpp::SensorDataQoS{});
+    lidar_publisher_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(kLidarTopic, rclcpp::SensorDataQoS{});
 
-    const double period_ms = this->declare_parameter<double>("period_ms", 100.0);
-    const double safe_period_ms = std::max(period_ms, 1.0);
+    const double kPeriodMs = this->declare_parameter<double>("period_ms", 100.0);
+    const double kSafePeriodMs = std::max(kPeriodMs, 1.0);
 
     timer_ = this->create_wall_timer(
-        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::duration<double, std::milli>(safe_period_ms)),
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::duration<double, std::milli>(kSafePeriodMs)),
         [this]() { PublishCloud(); });
 
-    RCLCPP_INFO(this->get_logger(), "FakeLidarPublisherNode started | lidar_topic=%s | period_ms=%.3f", lidar_topic.c_str(),
-                safe_period_ms);
+    RCLCPP_INFO(this->get_logger(), "FakeLidarPublisherNode started | lidar_topic=%s | period_ms=%.3f", kLidarTopic.c_str(),
+                kSafePeriodMs);
   }
 
  private:

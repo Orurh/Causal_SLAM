@@ -1,7 +1,8 @@
 CompileFlags:
-  CompilationDatabase: build
+  CompilationDatabase: .
   Add:
     - -I/opt/ros/jazzy/include
+    - -I${workspaceFolder}/src/causal_slam/src
     - --std=c++23
   Remove:
     - -fcolor-diagnostics

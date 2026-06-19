@@ -11,40 +11,38 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic -Werror=return-type)
 endif()
 
-# find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 
+set(CAUSAL_SLAM_CORE_SOURCES
+  src/telemetry/stream_timing_tracker.cc
+
+  src/lidar/lidar_scan_timing.cc
+  src/lidar/lidar_scan_window_estimator.cc
+
+  src/coverage/imu_coverage_analyzer.cc
+  src/coverage/imu_sample_buffer.cc
+)
+
+add_library(causal_slam_core STATIC
+  ${CAUSAL_SLAM_CORE_SOURCES}
+)
+
+target_include_directories(causal_slam_core
+  PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
 add_executable(temporal_monitor_node
   src/nodes/temporal_monitor_main.cc
   src/nodes/temporal_monitor_node.cc
-  src/telemetry/stream_timing_tracker.cc
 )
 
-target_include_directories(temporal_monitor_node
-  PRIVATE
-    src
-)
-
-add_executable(fake_imu_publisher_node
-  src/nodes/fake_imu_publisher_node.cc
-)
-
-add_executable(fake_lidar_publisher_node
-  src/nodes/fake_lidar_publisher_node.cc
-)
-
-ament_target_dependencies(fake_imu_publisher_node
-  rclcpp
-  sensor_msgs
-)
-
-ament_target_dependencies(fake_lidar_publisher_node
-  rclcpp
-  sensor_msgs
+target_link_libraries(temporal_monitor_node
+  causal_slam_core
 )
 
 ament_target_dependencies(temporal_monitor_node
@@ -54,7 +52,25 @@ ament_target_dependencies(temporal_monitor_node
   builtin_interfaces
 )
 
-install(TARGETS 
+add_executable(fake_imu_publisher_node
+  src/nodes/fake_imu_publisher_node.cc
+)
+
+ament_target_dependencies(fake_imu_publisher_node
+  rclcpp
+  sensor_msgs
+)
+
+add_executable(fake_lidar_publisher_node
+  src/nodes/fake_lidar_publisher_node.cc
+)
+
+ament_target_dependencies(fake_lidar_publisher_node
+  rclcpp
+  sensor_msgs
+)
+
+install(TARGETS
   temporal_monitor_node
   fake_imu_publisher_node
   fake_lidar_publisher_node
@@ -64,23 +80,38 @@ install(TARGETS
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
 
-  ament_add_gtest(stream_timing_tracker_test
+  function(add_causal_slam_gtest target_name)
+    ament_add_gtest(${target_name} ${ARGN})
+
+    if(TARGET ${target_name})
+      target_link_libraries(${target_name}
+        causal_slam_core
+      )
+    endif()
+  endfunction()
+
+  add_causal_slam_gtest(stream_timing_tracker_test
     tests/telemetry/stream_timing_tracker_test.cc
-    src/telemetry/stream_timing_tracker.cc
   )
 
-  target_include_directories(stream_timing_tracker_test
-    PRIVATE
-      src
+  add_causal_slam_gtest(lidar_scan_timing_test
+    tests/lidar/lidar_scan_timing_test.cc
+  )
+
+  add_causal_slam_gtest(lidar_scan_window_estimator_test
+    tests/lidar/lidar_scan_window_estimator_test.cc
+  )
+
+  add_causal_slam_gtest(imu_coverage_analyzer_test
+    tests/coverage/imu_coverage_analyzer_test.cc
+  )
+
+  add_causal_slam_gtest(imu_sample_buffer_test
+    tests/coverage/imu_sample_buffer_test.cc
   )
 
   # find_package(ament_lint_auto REQUIRED)
-  # # the following line skips the linter which checks for copyrights
-  # # comment the line when a copyright and license is added to all source files
   # set(ament_cmake_copyright_FOUND TRUE)
-  # # the following line skips cpplint (only works in a git repo)
-  # # comment the line when this package is in a git repo and when
-  # # a copyright and license is added to all source files
   # set(ament_cmake_cpplint_FOUND TRUE)
   # ament_lint_auto_find_test_dependencies()
 endif()

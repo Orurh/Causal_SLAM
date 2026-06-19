@@ -11,7 +11,7 @@ struct TimingSample {
   std::int64_t receive_time_ns{0};
 };
 
-enum class TimingHealth {
+enum class TimingHealth : std::uint8_t {
   kOk,
   kWarning,
   kDegraded,

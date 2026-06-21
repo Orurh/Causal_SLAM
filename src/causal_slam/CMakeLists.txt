@@ -27,6 +27,8 @@ set(CAUSAL_SLAM_CORE_SOURCES
   src/coverage/imu_sample_buffer.cc
 
   src/diagnostics/temporal_diagnostics.cc
+  src/statistics/temporal_statistics.cc
+
   src/render/console_temporal_summary_renderer.cc
 )
 
@@ -60,7 +62,6 @@ target_link_libraries(causal_slam_ros_adapters
 ament_target_dependencies(causal_slam_ros_adapters
   sensor_msgs
 )
-
 
 add_executable(temporal_monitor_node
   src/nodes/temporal_monitor_main.cc
@@ -105,9 +106,10 @@ install(TARGETS
 )
 
 if(BUILD_TESTING)
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
   find_package(ament_cmake_gtest REQUIRED)
 
-  function(add_causal_slam_gtest target_name)
+  function(add_causal_slam_core_gtest target_name)
     ament_add_gtest(${target_name} ${ARGN})
 
     if(TARGET ${target_name})
@@ -117,62 +119,66 @@ if(BUILD_TESTING)
     endif()
   endfunction()
 
-  add_causal_slam_gtest(stream_timing_tracker_test
+  function(add_causal_slam_ros_adapter_gtest target_name)
+    ament_add_gtest(${target_name} ${ARGN})
+
+    if(TARGET ${target_name})
+      target_link_libraries(${target_name}
+        causal_slam_ros_adapters
+      )
+
+      ament_target_dependencies(${target_name}
+        sensor_msgs
+      )
+    endif()
+  endfunction()
+
+  add_causal_slam_core_gtest(stream_timing_tracker_test
     tests/telemetry/stream_timing_tracker_test.cc
   )
 
-  add_causal_slam_gtest(lidar_scan_timing_test
+  add_causal_slam_core_gtest(lidar_scan_timing_test
     tests/lidar/lidar_scan_timing_test.cc
   )
 
-  add_causal_slam_gtest(lidar_scan_window_estimator_test
+  add_causal_slam_core_gtest(lidar_scan_window_estimator_test
     tests/lidar/lidar_scan_window_estimator_test.cc
   )
 
-  add_causal_slam_gtest(imu_coverage_analyzer_test
+  add_causal_slam_core_gtest(imu_coverage_analyzer_test
     tests/coverage/imu_coverage_analyzer_test.cc
   )
 
-  add_causal_slam_gtest(imu_sample_buffer_test
+  add_causal_slam_core_gtest(imu_sample_buffer_test
     tests/coverage/imu_sample_buffer_test.cc
   )
 
-  add_causal_slam_gtest(temporal_diagnostics_test
+  add_causal_slam_core_gtest(temporal_diagnostics_test
     tests/diagnostics/temporal_diagnostics_test.cc
   )
 
-  ament_add_gtest(point_cloud2_field_inspector_test
+  add_causal_slam_core_gtest(temporal_statistics_test
+    tests/statistics/temporal_statistics_test.cc
+  )
+
+  add_causal_slam_ros_adapter_gtest(point_cloud2_field_inspector_test
     tests/ros_adapters/point_cloud2_field_inspector_test.cc
   )
 
-  if(TARGET point_cloud2_field_inspector_test)
-    target_link_libraries(point_cloud2_field_inspector_test
-      causal_slam_ros_adapters
-    )
-
-    ament_target_dependencies(point_cloud2_field_inspector_test
-      sensor_msgs
-    )
-  endif()
-
-  ament_add_gtest(point_cloud2_time_field_extractor_test
+  add_causal_slam_ros_adapter_gtest(point_cloud2_time_field_extractor_test
     tests/ros_adapters/point_cloud2_time_field_extractor_test.cc
   )
-
-  if(TARGET point_cloud2_time_field_extractor_test)
-    target_link_libraries(point_cloud2_time_field_extractor_test
-      causal_slam_ros_adapters
-    )
-
-    ament_target_dependencies(point_cloud2_time_field_extractor_test
-      sensor_msgs
-    )
-  endif()
 
   # find_package(ament_lint_auto REQUIRED)
   # set(ament_cmake_copyright_FOUND TRUE)
   # set(ament_cmake_cpplint_FOUND TRUE)
   # ament_lint_auto_find_test_dependencies()
 endif()
+
+  add_test(
+    NAME architecture_dependency_test
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_arch_deps.py
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  )
 
 ament_package()

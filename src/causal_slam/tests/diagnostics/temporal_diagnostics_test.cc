@@ -10,7 +10,16 @@ namespace {
 
 namespace coverage = causal_slam::coverage;
 namespace lidar = causal_slam::lidar;
+namespace model = causal_slam::model;
 namespace telemetry = causal_slam::telemetry;
+
+template <typename T>
+concept HasOverallStatus = requires(T value) {
+  value.overall_status;
+};
+
+static_assert(!HasOverallStatus<model::TemporalObservation>);
+static_assert(HasOverallStatus<TemporalDiagnosticSnapshot>);
 
 telemetry::TimingSummary OkTiming() {
   telemetry::TimingSummary summary;
@@ -69,8 +78,8 @@ lidar::LidarScanWindowEstimate LowConfidenceFallbackWindow() {
   return estimate;
 }
 
-PointTimeDiagnostics SupportedOffsetTime() {
-  PointTimeDiagnostics diagnostics;
+model::PointTimeDiagnostics SupportedOffsetTime() {
+  model::PointTimeDiagnostics diagnostics;
   diagnostics.has_time_candidate = true;
   diagnostics.has_supported_time_field = true;
   diagnostics.field_name = "offset_time";
@@ -84,8 +93,8 @@ PointTimeDiagnostics SupportedOffsetTime() {
   return diagnostics;
 }
 
-PointTimeDiagnostics RejectedFloat32Timestamp() {
-  PointTimeDiagnostics diagnostics;
+model::PointTimeDiagnostics RejectedFloat32Timestamp() {
+  model::PointTimeDiagnostics diagnostics;
   diagnostics.has_time_candidate = true;
   diagnostics.has_supported_time_field = false;
   diagnostics.field_name = "timestamp";
@@ -96,11 +105,12 @@ PointTimeDiagnostics RejectedFloat32Timestamp() {
   return diagnostics;
 }
 
-TemporalDiagnosticsInput BaseOkInput() {
-  TemporalDiagnosticsInput input;
-  input.imu_timing = OkTiming();
-  input.lidar_timing = OkTiming();
-  input.has_imu_coverage = true;
+model::TemporalObservation BaseOkInput() {
+  model::TemporalObservation input;
+  input.streams = {
+      telemetry::MakeStreamTimingDiagnostic(telemetry::TemporalStreamId::kImu, OkTiming()),
+      telemetry::MakeStreamTimingDiagnostic(telemetry::TemporalStreamId::kLidar, OkTiming()),
+  };
   input.imu_coverage = OkCoverage();
   input.lidar_scan_window = HighConfidencePointTimeWindow();
   input.lidar_point_time = SupportedOffsetTime();
@@ -121,7 +131,7 @@ TEST(TemporalDiagnosticsBuilderTest,
 
   const auto snapshot = builder.Build(BaseOkInput());
 
-  EXPECT_EQ(snapshot.overall_status, TemporalHealthStatus::kOk);
+  EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kOk);
   EXPECT_TRUE(snapshot.issues.empty());
 }
 
@@ -134,7 +144,7 @@ TEST(TemporalDiagnosticsBuilderTest,
   const TemporalDiagnosticsBuilder builder;
   const auto snapshot = builder.Build(input);
 
-  EXPECT_EQ(snapshot.overall_status, TemporalHealthStatus::kWarning);
+  EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kWarning);
   EXPECT_TRUE(HasIssueWithTitle(
       snapshot, "LiDAR point timestamps were detected but not trusted"));
 }
@@ -144,7 +154,7 @@ TEST(TemporalDiagnosticsBuilderTest,
   auto input = BaseOkInput();
   input.lidar_scan_window = MediumConfidenceMeasuredWindow();
 
-  PointTimeDiagnostics no_point_time;
+  model::PointTimeDiagnostics no_point_time;
   no_point_time.has_time_candidate = false;
   no_point_time.has_supported_time_field = false;
   no_point_time.inspection_reason = "no_time_field_candidate";
@@ -153,7 +163,7 @@ TEST(TemporalDiagnosticsBuilderTest,
   const TemporalDiagnosticsBuilder builder;
   const auto snapshot = builder.Build(input);
 
-  EXPECT_EQ(snapshot.overall_status, TemporalHealthStatus::kOk);
+  EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kOk);
   EXPECT_TRUE(snapshot.issues.empty());
 }
 
@@ -164,7 +174,7 @@ TEST(TemporalDiagnosticsBuilderTest, LowConfidenceScanWindowProducesWarning) {
   const TemporalDiagnosticsBuilder builder;
   const auto snapshot = builder.Build(input);
 
-  EXPECT_EQ(snapshot.overall_status, TemporalHealthStatus::kWarning);
+  EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kWarning);
   EXPECT_TRUE(HasIssueWithTitle(
       snapshot, "LiDAR scan window has low confidence"));
 }
@@ -176,7 +186,7 @@ TEST(TemporalDiagnosticsBuilderTest, DegradedImuCoverageProducesDegraded) {
   const TemporalDiagnosticsBuilder builder;
   const auto snapshot = builder.Build(input);
 
-  EXPECT_EQ(snapshot.overall_status, TemporalHealthStatus::kDegraded);
+  EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kDegraded);
   EXPECT_TRUE(HasIssueWithTitle(
       snapshot, "IMU does not properly cover the LiDAR scan window"));
 }

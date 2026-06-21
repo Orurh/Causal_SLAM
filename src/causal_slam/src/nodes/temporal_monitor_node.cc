@@ -4,34 +4,66 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "render/console_temporal_summary_renderer.h"
+#include "model/temporal_observation.h"
 
 namespace causal_slam::nodes {
 
 namespace coverage = causal_slam::coverage;
 namespace diagnostics = causal_slam::diagnostics;
 namespace lidar = causal_slam::lidar;
+namespace model = causal_slam::model;
 namespace render = causal_slam::render;
 namespace ros_adapters = causal_slam::ros_adapters;
 namespace telemetry = causal_slam::telemetry;
+namespace statistics = causal_slam::statistics;
 
 namespace {
 
-void LogTimingSummary(const rclcpp::Logger& logger, const char* stream_name, const telemetry::TimingSummary& summary) {
+void LogTimingSummary(
+    const rclcpp::Logger& logger,
+    const telemetry::StreamTimingDiagnostic& stream) {
+  const auto& summary = stream.timing;
+
   RCLCPP_INFO_STREAM(
-      logger, stream_name << " timing"
-                          << " | total_count=" << summary.total_count << " | window_count=" << summary.window_count
-                          << " | last_delay_ms=" << summary.last_delay_ms << " | window_avg_delay_ms=" << summary.window_average_delay_ms
-                          << " | window_max_delay_ms=" << summary.window_max_delay_ms << " | last_period_ms=" << summary.last_period_ms
-                          << " | last_jitter_ms=" << summary.last_jitter_ms << " | window_max_jitter_ms=" << summary.window_max_jitter_ms
-                          << " | total_reordered_count=" << summary.total_reordered_count << " | window_reordered_count="
-                          << summary.window_reordered_count << " | total_gap_count=" << summary.total_gap_count
-                          << " | window_gap_count=" << summary.window_gap_count << " | max_gap_ms=" << summary.max_gap_ms
-                          << " | health=" << telemetry::ToString(summary.health) << " | reason=" << summary.reason);
+      logger, telemetry::ToString(stream.id)
+                  << " timing"
+                  << " | total_count=" << summary.total_count
+                  << " | window_count=" << summary.window_count
+                  << " | last_delay_ms=" << summary.last_delay_ms
+                  << " | window_avg_delay_ms="
+                  << summary.window_average_delay_ms
+                  << " | window_max_delay_ms=" << summary.window_max_delay_ms
+                  << " | last_period_ms=" << summary.last_period_ms
+                  << " | last_jitter_ms=" << summary.last_jitter_ms
+                  << " | window_max_jitter_ms="
+                  << summary.window_max_jitter_ms
+                  << " | total_reordered_count="
+                  << summary.total_reordered_count
+                  << " | window_reordered_count="
+                  << summary.window_reordered_count
+                  << " | total_gap_count=" << summary.total_gap_count
+                  << " | window_gap_count=" << summary.window_gap_count
+                  << " | max_gap_ms=" << summary.max_gap_ms
+                  << " | health=" << telemetry::ToString(summary.health)
+                  << " | reason=" << summary.reason);
+}
+
+std::vector<telemetry::StreamTimingDiagnostic> BuildTimingDiagnostics(
+    const telemetry::TimingSummary& imu_summary,
+    const telemetry::TimingSummary& lidar_summary) {
+  return {
+      telemetry::MakeStreamTimingDiagnostic(
+          telemetry::TemporalStreamId::kImu, imu_summary),
+      telemetry::MakeStreamTimingDiagnostic(
+          telemetry::TemporalStreamId::kLidar, lidar_summary),
+  };
 }
 
 lidar::LidarStampPolicy ParseLidarStampPolicy(std::string_view value) {
@@ -73,24 +105,42 @@ lidar::LidarScanWindowEstimate BuildPointTimeFieldEstimate(const ros_adapters::P
   };
 }
 
-void LogImuCoverageSummary(const rclcpp::Logger& logger, bool has_summary, const coverage::ImuCoverageSummary& summary,
-                           const lidar::LidarScanWindowEstimate& scan_window_estimate, std::size_t imu_buffer_size) {
-  if (!has_summary) {
-    RCLCPP_INFO_STREAM(logger, "IMU coverage" << " | status=not_available"
-                                              << " | reason=no_lidar_scan_received_yet"
-                                              << " | imu_buffer_size=" << imu_buffer_size);
+void LogImuCoverageSummary(
+    const rclcpp::Logger& logger,
+    const std::optional<coverage::ImuCoverageSummary>& summary,
+    const std::optional<lidar::LidarScanWindowEstimate>& scan_window_estimate,
+    std::size_t imu_buffer_size) {
+  if (!summary.has_value() || !scan_window_estimate.has_value()) {
+    RCLCPP_INFO_STREAM(logger, "IMU coverage"
+                                   << " | status=not_available"
+                                   << " | reason=no_lidar_scan_received_yet"
+                                   << " | imu_buffer_size=" << imu_buffer_size);
     return;
   }
 
+  const auto& coverage_summary = *summary;
+  const auto& scan_window = *scan_window_estimate;
+
   RCLCPP_INFO_STREAM(
-      logger, "IMU coverage" << " | imu_count_in_window=" << summary.imu_count_in_window
-                             << " | missing_prefix_ms=" << summary.missing_prefix_ms << " | missing_suffix_ms=" << summary.missing_suffix_ms
-                             << " | max_gap_inside_ms=" << summary.max_gap_inside_ms << " | coverage_ratio=" << summary.coverage_ratio
-                             << " | health=" << coverage::ToString(summary.health) << " | reason=" << summary.reason
-                             << " | scan_window_duration_ms=" << scan_window_estimate.duration_ms
-                             << " | scan_window_source=" << lidar::ToString(scan_window_estimate.source)
-                             << " | scan_window_confidence=" << lidar::ToString(scan_window_estimate.confidence)
-                             << " | scan_window_reason=" << scan_window_estimate.reason << " | imu_buffer_size=" << imu_buffer_size);
+      logger, "IMU coverage"
+                  << " | imu_count_in_window="
+                  << coverage_summary.imu_count_in_window
+                  << " | missing_prefix_ms="
+                  << coverage_summary.missing_prefix_ms
+                  << " | missing_suffix_ms="
+                  << coverage_summary.missing_suffix_ms
+                  << " | max_gap_inside_ms="
+                  << coverage_summary.max_gap_inside_ms
+                  << " | coverage_ratio=" << coverage_summary.coverage_ratio
+                  << " | health=" << coverage::ToString(coverage_summary.health)
+                  << " | reason=" << coverage_summary.reason
+                  << " | scan_window_duration_ms=" << scan_window.duration_ms
+                  << " | scan_window_source="
+                  << lidar::ToString(scan_window.source)
+                  << " | scan_window_confidence="
+                  << lidar::ToString(scan_window.confidence)
+                  << " | scan_window_reason=" << scan_window.reason
+                  << " | imu_buffer_size=" << imu_buffer_size);
 }
 
 void LogPointCloud2FieldInspection(const rclcpp::Logger& logger, const ros_adapters::PointCloud2FieldInspection& inspection) {
@@ -127,8 +177,8 @@ void LogPointCloud2FieldInspection(const rclcpp::Logger& logger, const ros_adapt
   }
 }
 
-diagnostics::PointTimeDiagnostics BuildPointTimeDiagnostics(const ros_adapters::PointCloud2FieldInspection& inspection) {
-  diagnostics::PointTimeDiagnostics diagnostics;
+model::PointTimeDiagnostics BuildPointTimeDiagnostics(const ros_adapters::PointCloud2FieldInspection& inspection) {
+  model::PointTimeDiagnostics diagnostics;
 
   diagnostics.has_time_candidate = inspection.has_time_candidate;
   diagnostics.has_supported_time_field = inspection.has_supported_time_field;
@@ -263,7 +313,7 @@ void TemporalMonitorNode::OnImuReceived(ImuMsg::ConstSharedPtr msg) {
 void TemporalMonitorNode::OnLidarReceived(PointCloud2Msg::ConstSharedPtr msg) {
   const std::int64_t stamp_ns = rclcpp::Time(msg->header.stamp).nanoseconds();
 
-  if (!has_logged_lidar_point_cloud2_fields_) {
+  if (!latest_lidar_point_time_diagnostics_.has_value()) {
     const auto inspection = point_cloud2_field_inspector_.Inspect(*msg);
     LogPointCloud2FieldInspection(this->get_logger(), inspection);
 
@@ -273,7 +323,7 @@ void TemporalMonitorNode::OnLidarReceived(PointCloud2Msg::ConstSharedPtr msg) {
       lidar_point_time_field_ = *inspection.primary_time_field;
     }
 
-    has_logged_lidar_point_cloud2_fields_ = true;
+
   }
 
   lidar_timing_tracker_.Observe(telemetry::TimingSample{
@@ -281,48 +331,67 @@ void TemporalMonitorNode::OnLidarReceived(PointCloud2Msg::ConstSharedPtr msg) {
       .receive_time_ns = this->now().nanoseconds(),
   });
 
-  latest_lidar_scan_window_estimate_ = lidar_scan_window_estimator_.Estimate(stamp_ns);
+  latest_lidar_scan_window_estimate_ =
+      lidar_scan_window_estimator_.Estimate(stamp_ns);
 
   if (lidar_point_time_field_.has_value()) {
     const auto extraction = point_cloud2_time_field_extractor_.Extract(*msg, *lidar_point_time_field_);
 
-    latest_lidar_point_time_diagnostics_.extraction_attempted = true;
-    latest_lidar_point_time_diagnostics_.extraction_used = extraction.has_scan_window;
-    latest_lidar_point_time_diagnostics_.extraction_reason = extraction.reason;
-    latest_lidar_point_time_diagnostics_.extraction_unit = ros_adapters::ToString(extraction.time_unit);
+    auto& point_time_diagnostics =
+        latest_lidar_point_time_diagnostics_.emplace(
+            latest_lidar_point_time_diagnostics_.value_or(
+                model::PointTimeDiagnostics{}));
+
+    point_time_diagnostics.extraction_attempted = true;
+    point_time_diagnostics.extraction_used = extraction.has_scan_window;
+    point_time_diagnostics.extraction_reason = extraction.reason;
+    point_time_diagnostics.extraction_unit =
+        ros_adapters::ToString(extraction.time_unit);
 
     if (extraction.has_scan_window) {
       latest_lidar_scan_window_estimate_ = BuildPointTimeFieldEstimate(extraction);
     }
   }
 
-  latest_imu_coverage_summary_ = imu_coverage_analyzer_.Analyze(latest_lidar_scan_window_estimate_.window, imu_sample_buffer_.Samples());
-
-  has_lidar_coverage_summary_ = true;
+  latest_imu_coverage_summary_ = imu_coverage_analyzer_.Analyze(
+      latest_lidar_scan_window_estimate_->window, imu_sample_buffer_.Samples());
 }
 
 void TemporalMonitorNode::OnTimer() {
   const auto imu_summary = imu_timing_tracker_.ConsumeWindowSummary();
   const auto lidar_summary = lidar_timing_tracker_.ConsumeWindowSummary();
 
-  LogTimingSummary(this->get_logger(), "IMU", imu_summary);
-  LogTimingSummary(this->get_logger(), "LiDAR", lidar_summary);
-  LogImuCoverageSummary(this->get_logger(), has_lidar_coverage_summary_, latest_imu_coverage_summary_, latest_lidar_scan_window_estimate_,
+  const auto streams = BuildTimingDiagnostics(imu_summary, lidar_summary);
+
+  for (const auto& stream : streams) {
+    LogTimingSummary(this->get_logger(), stream);
+  }
+
+  LogImuCoverageSummary(this->get_logger(),
+                        latest_imu_coverage_summary_,
+                        latest_lidar_scan_window_estimate_,
                         imu_sample_buffer_.Size());
 
-  const diagnostics::TemporalDiagnosticsBuilder diagnostics_builder;
-  const auto diagnostic_snapshot = diagnostics_builder.Build(diagnostics::TemporalDiagnosticsInput{
-      .imu_timing = imu_summary,
-      .lidar_timing = lidar_summary,
-      .has_imu_coverage = has_lidar_coverage_summary_,
+  const model::TemporalObservation observation{
+      .streams = streams,
       .imu_coverage = latest_imu_coverage_summary_,
       .lidar_scan_window = latest_lidar_scan_window_estimate_,
       .lidar_point_time = latest_lidar_point_time_diagnostics_,
       .imu_buffer_size = imu_sample_buffer_.Size(),
-  });
+  };
+
+  const diagnostics::TemporalDiagnosticsBuilder diagnostics_builder;
+  const auto diagnostic_snapshot = diagnostics_builder.Build(observation);
+
+  const std::int64_t now_ns = this->now().nanoseconds();
+
+  temporal_statistics_.Observe(
+      now_ns, diagnostic_snapshot.observation, diagnostic_snapshot.overall_status);
+  const statistics::TemporalStatisticsSnapshot statistics_snapshot = temporal_statistics_.Snapshot(now_ns);
 
   const render::ConsoleTemporalSummaryRenderer renderer;
-  RCLCPP_INFO_STREAM(this->get_logger(), "\n" << renderer.Render(diagnostic_snapshot));
+  RCLCPP_INFO_STREAM(this->get_logger(), "\n" << renderer.Render(diagnostic_snapshot) << '\n'
+                                              << renderer.RenderStatistics(statistics_snapshot));
 }
 
 }  // namespace causal_slam::nodes

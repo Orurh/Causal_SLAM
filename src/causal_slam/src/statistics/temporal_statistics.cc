@@ -32,7 +32,7 @@ NumericStats BuildNumericStats(std::vector<double> values) {
     return stats;
   }
 
-  std::ranges::sort(values);
+  std::sort(values.begin(), values.end());
 
   stats.min = values.front();
   stats.max = values.back();
@@ -111,9 +111,10 @@ void AddScanWindowConfidenceSample(causal_slam::lidar::LidarScanWindowConfidence
 StreamTimingAccumulator& FindOrAppendStreamAccumulator(
     std::vector<StreamTimingAccumulator>* accumulators,
     causal_slam::telemetry::TemporalStreamId id) {
-  auto it = std::ranges::find_if(*accumulators, [id](const auto& item) {
-    return item.id == id;
-  });
+  auto it = std::find_if(
+      accumulators->begin(), accumulators->end(), [id](const auto& item) {
+        return item.id == id;
+      });
 
   if (it != accumulators->end()) {
     return *it;

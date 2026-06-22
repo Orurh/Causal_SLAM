@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <string>
+#include <type_traits>
+#include <utility>
 
 #include <gtest/gtest.h>
 
@@ -16,13 +18,15 @@ namespace model = causal_slam::model;
 namespace policy = causal_slam::policy;
 namespace telemetry = causal_slam::telemetry;
 
-template <typename T>
-concept HasOverallStatus = requires(T value) {
-  value.overall_status;
-};
+template <typename T, typename = void>
+struct HasOverallStatus : std::false_type {};
 
-static_assert(!HasOverallStatus<model::TemporalObservation>);
-static_assert(HasOverallStatus<TemporalDiagnosticSnapshot>);
+template <typename T>
+struct HasOverallStatus<T, std::void_t<decltype(std::declval<T>().overall_status)>>
+    : std::true_type {};
+
+static_assert(!HasOverallStatus<model::TemporalObservation>::value);
+static_assert(HasOverallStatus<TemporalDiagnosticSnapshot>::value);
 
 telemetry::TimingSummary OkTiming() {
   telemetry::TimingSummary summary;
@@ -123,16 +127,18 @@ model::TemporalObservation BaseOkInput() {
 
 bool HasIssueWithTitle(const TemporalDiagnosticSnapshot& snapshot,
                        const std::string& title) {
-  return std::ranges::any_of(snapshot.issues, [&](const auto& issue) {
-    return issue.title == title;
-  });
+  return std::any_of(snapshot.issues.begin(), snapshot.issues.end(),
+                     [&](const auto& issue) {
+                       return issue.title == title;
+                     });
 }
 
 bool HasIssueWithReason(const TemporalDiagnosticSnapshot& snapshot,
                         TemporalFaultReason reason) {
-  return std::ranges::any_of(snapshot.issues, [reason](const auto& issue) {
-    return issue.reason == reason;
-  });
+  return std::any_of(snapshot.issues.begin(), snapshot.issues.end(),
+                     [reason](const auto& issue) {
+                       return issue.reason == reason;
+                     });
 }
 
 TEST(TemporalDiagnosticsBuilderTest, FaultReasonToStringIsStable) {

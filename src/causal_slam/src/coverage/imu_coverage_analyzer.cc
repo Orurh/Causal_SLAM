@@ -96,7 +96,7 @@ ImuCoverageSummary ImuCoverageAnalyzer::AnalyzeStamps(
     };
   }
 
-  std::ranges::sort(stamps);
+  std::sort(stamps.begin(), stamps.end());
 
   const double scan_duration_ms =
       NanosecondsToMilliseconds(scan_window.DurationNs());

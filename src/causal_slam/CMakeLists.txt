@@ -23,11 +23,17 @@ set(CAUSAL_SLAM_CORE_SOURCES
   src/lidar/lidar_scan_timing.cc
   src/lidar/lidar_scan_window_estimator.cc
 
+  src/pointcloud/point_cloud2_field_inspector.cc
+  src/pointcloud/point_cloud2_time_field_extractor.cc
+
   src/coverage/imu_coverage_analyzer.cc
   src/coverage/imu_sample_buffer.cc
 
   src/diagnostics/temporal_diagnostics.cc
+  src/diagnostics/temporal_fault_reason_formatter.cc
   src/statistics/temporal_statistics.cc
+
+  src/pipeline/temporal_monitor_pipeline.cc
 
   src/render/console_temporal_summary_renderer.cc
 )
@@ -42,6 +48,7 @@ target_include_directories(causal_slam_core
 )
 
 set(CAUSAL_SLAM_ROS_ADAPTER_SOURCES
+  src/ros_adapters/point_cloud2_conversions.cc
   src/ros_adapters/point_cloud2_field_inspector.cc
   src/ros_adapters/point_cloud2_time_field_extractor.cc
 )
@@ -157,12 +164,28 @@ if(BUILD_TESTING)
     tests/diagnostics/temporal_diagnostics_test.cc
   )
 
+  add_causal_slam_core_gtest(temporal_fault_reason_formatter_test
+    tests/diagnostics/temporal_fault_reason_formatter_test.cc
+  )
+
   add_causal_slam_core_gtest(map_update_decision_test
     tests/policy/map_update_decision_test.cc
   )
 
   add_causal_slam_core_gtest(temporal_statistics_test
     tests/statistics/temporal_statistics_test.cc
+  )
+
+  add_causal_slam_core_gtest(point_cloud2_field_inspector_core_test
+    tests/pointcloud/point_cloud2_field_inspector_test.cc
+  )
+
+  add_causal_slam_core_gtest(point_cloud2_time_field_extractor_core_test
+    tests/pointcloud/point_cloud2_time_field_extractor_test.cc
+  )
+
+  add_causal_slam_core_gtest(temporal_monitor_pipeline_test
+    tests/pipeline/temporal_monitor_pipeline_test.cc
   )
 
   add_causal_slam_ros_adapter_gtest(point_cloud2_field_inspector_test
@@ -176,6 +199,18 @@ if(BUILD_TESTING)
   add_test(
     NAME architecture_dependency_test
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_arch_deps.py
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+
+  add_test(
+    NAME ros1_compatibility_audit_test
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/audit_ros1_compatibility.py
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+
+  add_test(
+    NAME ros1_adapter_audit_test
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/audit_ros1_adapter.py
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   )
 

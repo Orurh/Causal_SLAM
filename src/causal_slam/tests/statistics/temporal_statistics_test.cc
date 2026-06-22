@@ -20,9 +20,10 @@ std::int64_t Seconds(std::int64_t seconds) {
 const StreamTimingStatistics* FindStream(
     const TemporalWindowStatistics& stats,
     telemetry::TemporalStreamId id) {
-  const auto it = std::ranges::find_if(stats.streams, [id](const auto& stream) {
-    return stream.id == id;
-  });
+  const auto it = std::find_if(
+      stats.streams.begin(), stats.streams.end(), [id](const auto& stream) {
+        return stream.id == id;
+      });
 
   if (it == stats.streams.end()) {
     return nullptr;

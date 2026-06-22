@@ -49,8 +49,6 @@ target_include_directories(causal_slam_core
 
 set(CAUSAL_SLAM_ROS_ADAPTER_SOURCES
   src/ros_adapters/point_cloud2_conversions.cc
-  src/ros_adapters/point_cloud2_field_inspector.cc
-  src/ros_adapters/point_cloud2_time_field_extractor.cc
 )
 
 add_library(causal_slam_ros_adapters STATIC
@@ -186,14 +184,6 @@ if(BUILD_TESTING)
 
   add_causal_slam_core_gtest(temporal_monitor_pipeline_test
     tests/pipeline/temporal_monitor_pipeline_test.cc
-  )
-
-  add_causal_slam_ros_adapter_gtest(point_cloud2_field_inspector_test
-    tests/ros_adapters/point_cloud2_field_inspector_test.cc
-  )
-
-  add_causal_slam_ros_adapter_gtest(point_cloud2_time_field_extractor_test
-    tests/ros_adapters/point_cloud2_time_field_extractor_test.cc
   )
 
   add_test(

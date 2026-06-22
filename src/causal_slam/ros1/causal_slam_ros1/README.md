@@ -191,3 +191,14 @@ The ROS2 Jazzy package and smoke test are currently validated.
 
 The ROS1 adapter still needs to be compiled and tested in a real Noetic
 workspace with real or simulated `/points` and `/imu/data` topics.
+
+## Cross-ROS development contract
+
+See also:
+
+~~~text
+docs/ROS_COMPATIBILITY.md
+~~~
+
+The ROS1 adapter must stay thin and must not duplicate temporal integrity logic
+from the shared core.

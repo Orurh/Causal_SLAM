@@ -3,35 +3,49 @@
 from pathlib import Path
 import re
 import sys
-from collections import defaultdict
 
-SOURCE_DIRS = [Path("src")]
-EXTS = {".h", ".hpp", ".cc", ".cpp", ".cxx"}
+ROOT = Path(__file__).resolve().parents[1]
 
-# Supports both:
-#   #include "foo/bar.h"
-#   #include <foo/bar.hpp>
-INCLUDE_RE = re.compile(r'^\s*#include\s+["<]([^">]+)[">]')
+INTERNAL_MODULES = {
+    "core",
+    "coverage",
+    "diagnostics",
+    "lidar",
+    "model",
+    "nodes",
+    "pipeline",
+    "pointcloud",
+    "policy",
+    "render",
+    "ros_adapters",
+    "statistics",
+    "telemetry",
+}
 
-
-def module_of(path: str) -> str:
-    parts = Path(path).parts
-    if len(parts) >= 2 and parts[0] == "src":
-        return parts[1]
-    return parts[0] if parts else "unknown"
-
-
-def normalize_internal_include(include: str) -> str | None:
-    p = Path("src") / include
-    if p.exists():
-        return str(p)
-    return None
-
-
-allowed_edges = {
+ALLOWED_DEPS = {
     ("coverage", "core"),
+
+    ("diagnostics", "model"),
+    ("diagnostics", "policy"),
+    ("diagnostics", "telemetry"),
+
     ("lidar", "core"),
-    ("ros_adapters", "core"),
+
+    ("model", "coverage"),
+    ("model", "lidar"),
+    ("model", "telemetry"),
+
+    ("nodes", "coverage"),
+    ("nodes", "diagnostics"),
+    ("nodes", "lidar"),
+    ("nodes", "model"),
+    ("nodes", "pipeline"),
+    ("nodes", "policy"),
+    ("nodes", "render"),
+    ("nodes", "ros_adapters"),
+    ("nodes", "statistics"),
+    ("nodes", "telemetry"),
+
     ("pipeline", "coverage"),
     ("pipeline", "diagnostics"),
     ("pipeline", "lidar"),
@@ -39,146 +53,166 @@ allowed_edges = {
     ("pipeline", "pointcloud"),
     ("pipeline", "statistics"),
     ("pipeline", "telemetry"),
-    ("pointcloud", "core"),
-    ("ros_adapters", "pointcloud"),
 
-    ("model", "coverage"),
-    ("model", "lidar"),
-    ("model", "telemetry"),
+    ("pointcloud", "core"),
 
     ("policy", "telemetry"),
-
-    ("diagnostics", "model"),
-    ("diagnostics", "telemetry"),
-    ("diagnostics", "policy"),
-
-    ("statistics", "model"),
-    ("statistics", "telemetry"),
 
     ("render", "diagnostics"),
     ("render", "policy"),
     ("render", "statistics"),
 
-    ("nodes", "coverage"),
-    ("nodes", "diagnostics"),
-    ("nodes", "lidar"),
-    ("nodes", "model"),
-    ("nodes", "policy"),
-    ("nodes", "pipeline"),
-    ("nodes", "render"),
-    ("nodes", "ros_adapters"),
-    ("nodes", "statistics"),
-    ("nodes", "telemetry"),
+    ("ros_adapters", "pointcloud"),
+
+    ("statistics", "model"),
+    ("statistics", "telemetry"),
+
+    # ROS1 Noetic adapter boundary.
+    # It is intentionally outside the shared ROS-free core.
+    ("ros1_adapter", "coverage"),
+    ("ros1_adapter", "diagnostics"),
+    ("ros1_adapter", "lidar"),
+    ("ros1_adapter", "pipeline"),
+    ("ros1_adapter", "pointcloud"),
+    ("ros1_adapter", "policy"),
+    ("ros1_adapter", "render"),
+    ("ros1_adapter", "telemetry"),
 }
 
-forbidden_edges = {
-    ("telemetry", "coverage"),
-    ("telemetry", "lidar"),
-    ("telemetry", "diagnostics"),
-    ("telemetry", "statistics"),
-    ("telemetry", "render"),
-    ("telemetry", "nodes"),
-
-    ("model", "diagnostics"),
-    ("model", "statistics"),
-    ("model", "render"),
-    ("model", "nodes"),
-
-    ("policy", "nodes"),
-    ("policy", "render"),
-    ("policy", "statistics"),
-    ("policy", "diagnostics"),
-    ("diagnostics", "render"),
-    ("diagnostics", "nodes"),
-
-    ("statistics", "diagnostics"),
-    ("statistics", "render"),
-    ("statistics", "nodes"),
-
-    ("render", "nodes"),
-}
-
-ros_external_prefixes = (
+ROS_FACING_INCLUDE_PREFIXES = (
     "rclcpp/",
-    "rclcpp_components/",
-    "rclcpp_action/",
+    "builtin_interfaces/msg/",
+    "sensor_msgs/msg/",
+    "std_msgs/msg/",
+    "geometry_msgs/msg/",
+    "nav_msgs/msg/",
+    "tf2_ros/",
+
+    "ros/",
     "sensor_msgs/",
     "std_msgs/",
-    "builtin_interfaces/",
     "geometry_msgs/",
     "nav_msgs/",
-    "tf2/",
-    "tf2_ros/",
-    "tf2_msgs/",
-    "message_filters/",
+    "tf/",
 )
 
-ros_allowed_modules = {
+ROS_FACING_ALLOWED_MODULES = {
     "nodes",
     "ros_adapters",
+    "ros1_adapter",
 }
 
-
-def is_ros_external_include(include: str) -> bool:
-    return include.startswith(ros_external_prefixes)
+INCLUDE_RE = re.compile(r'^\s*#include\s+[<"]([^>"]+)[>"]')
 
 
-module_edges: dict[str, set[str]] = defaultdict(set)
-violations: list[str] = []
+def iter_code_files():
+    roots = [
+        ROOT / "src",
+        ROOT / "tests",
+        ROOT / "ros1",
+    ]
 
-for base in SOURCE_DIRS:
-    for path in base.rglob("*"):
-        if path.suffix not in EXTS or not path.is_file():
+    for root in roots:
+        if not root.exists():
             continue
 
-        src_file = str(path)
-        src_module = module_of(src_file)
+        for path in root.rglob("*"):
+            if path.suffix in {".h", ".hpp", ".cc", ".cpp"}:
+                yield path
 
-        for line_number, line in enumerate(path.read_text(errors="replace").splitlines(), start=1):
-            match = INCLUDE_RE.match(line)
-            if not match:
+
+def module_for_path(path: Path) -> str | None:
+    rel = path.relative_to(ROOT)
+    parts = rel.parts
+
+    if not parts:
+        return None
+
+    if parts[0] == "src" and len(parts) >= 2:
+        return parts[1]
+
+    if parts[0] == "tests" and len(parts) >= 2:
+        return parts[1]
+
+    if parts[0] == "ros1":
+        return "ros1_adapter"
+
+    return None
+
+
+def is_ros_facing_include(include: str) -> bool:
+    return include.startswith(ROS_FACING_INCLUDE_PREFIXES)
+
+
+def internal_target_module(include: str) -> str | None:
+    first = include.split("/", 1)[0]
+
+    if first in INTERNAL_MODULES:
+        return first
+
+    return None
+
+
+def includes_of(path: Path):
+    text = path.read_text(errors="replace")
+
+    for line_no, line in enumerate(text.splitlines(), start=1):
+        match = INCLUDE_RE.match(line)
+        if match:
+            yield line_no, match.group(1)
+
+
+def main() -> int:
+    deps: set[tuple[str, str]] = set()
+    violations: list[str] = []
+
+    for path in iter_code_files():
+        source_module = module_for_path(path)
+
+        if source_module is None:
+            continue
+
+        rel = path.relative_to(ROOT)
+
+        for line_no, include in includes_of(path):
+            if is_ros_facing_include(include):
+                if source_module not in ROS_FACING_ALLOWED_MODULES:
+                    violations.append(
+                        f'{rel}:{line_no}: #include <{include}> is ROS-facing '
+                        f'and is only allowed in {sorted(ROS_FACING_ALLOWED_MODULES)}; '
+                        f'current module is "{source_module}"'
+                    )
+
+            target_module = internal_target_module(include)
+            if target_module is None:
                 continue
 
-            include = match.group(1)
-
-            if is_ros_external_include(include) and src_module not in ros_allowed_modules:
-                violations.append(
-                    f'{src_file}:{line_number}: #include <{include}> is ROS-facing and is only allowed in '
-                    f'{sorted(ros_allowed_modules)}; current module is "{src_module}"'
-                )
-
-            dst_file = normalize_internal_include(include)
-            if dst_file is None:
+            if target_module == source_module:
                 continue
 
-            dst_module = module_of(dst_file)
-            if src_module == dst_module:
-                continue
+            deps.add((source_module, target_module))
 
-            module_edges[src_module].add(dst_module)
-
-            edge = (src_module, dst_module)
-            if edge in forbidden_edges:
+            if (source_module, target_module) not in ALLOWED_DEPS:
                 violations.append(
-                    f'{src_file}:{line_number}: #include "{include}" creates forbidden dependency '
-                    f'{src_module} -> {dst_module}'
+                    f'{rel}:{line_no}: #include "{include}" creates unapproved '
+                    f'dependency {source_module} -> {target_module}'
                 )
 
-            if edge not in allowed_edges:
-                violations.append(
-                    f'{src_file}:{line_number}: #include "{include}" creates unapproved dependency '
-                    f'{src_module} -> {dst_module}'
-                )
+    print("Module dependencies:")
+    for source, target in sorted(deps):
+        print(f"  {source} -> {target}")
 
-print("Module dependencies:")
-for src in sorted(module_edges):
-    for dst in sorted(module_edges[src]):
-        print(f"  {src} -> {dst}")
+    if violations:
+        print()
+        print("Architecture dependency violations:")
+        for violation in violations:
+            print(f"  {violation}")
+        return 1
 
-if violations:
-    print("\nArchitecture dependency violations:", file=sys.stderr)
-    for violation in violations:
-        print(f"  {violation}", file=sys.stderr)
-    sys.exit(1)
+    print()
+    print("Architecture dependency check: OK")
+    return 0
 
-print("\nArchitecture dependency check: OK")
+
+if __name__ == "__main__":
+    sys.exit(main())

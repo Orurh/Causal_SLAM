@@ -12,6 +12,7 @@
 
 #include "render/console_temporal_summary_renderer.h"
 #include "model/temporal_observation.h"
+#include "policy/map_update_decision.h"
 
 namespace causal_slam::nodes {
 
@@ -212,6 +213,16 @@ TemporalMonitorNode::TemporalMonitorNode(const rclcpp::NodeOptions& options) : r
   const std::string imu_topic = this->declare_parameter<std::string>("imu_topic", "/imu/data");
   const std::string lidar_topic = this->declare_parameter<std::string>("lidar_topic", "/points");
 
+  const std::string map_update_allowed_topic =
+      this->declare_parameter<std::string>(
+          "map_update_allowed_topic", "/causal_slam/map_update_allowed");
+  const std::string temporal_health_topic =
+      this->declare_parameter<std::string>(
+          "temporal_health_topic", "/causal_slam/temporal_health");
+  const std::string map_update_reason_topic =
+      this->declare_parameter<std::string>(
+          "map_update_reason_topic", "/causal_slam/map_update_reason");
+
   const double summary_period_ms = this->declare_parameter<double>("summary_period_ms", 2000.0);
   const double safe_summary_period_ms = std::max(summary_period_ms, 100.0);
 
@@ -269,6 +280,17 @@ TemporalMonitorNode::TemporalMonitorNode(const rclcpp::NodeOptions& options) : r
   lidar_subscription_ = this->create_subscription<PointCloud2Msg>(lidar_topic, rclcpp::SensorDataQoS{},
                                                                   [this](PointCloud2Msg::ConstSharedPtr msg) { OnLidarReceived(msg); });
 
+  auto diagnostic_qos = rclcpp::QoS{1};
+  diagnostic_qos.reliable();
+  diagnostic_qos.transient_local();
+
+  map_update_allowed_publisher_ =
+      this->create_publisher<BoolMsg>(map_update_allowed_topic, diagnostic_qos);
+  temporal_health_publisher_ =
+      this->create_publisher<StringMsg>(temporal_health_topic, diagnostic_qos);
+  map_update_reason_publisher_ =
+      this->create_publisher<StringMsg>(map_update_reason_topic, diagnostic_qos);
+
   timer_ = this->create_wall_timer(
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::duration<double, std::milli>(safe_summary_period_ms)),
       [this]() { OnTimer(); });
@@ -277,6 +299,9 @@ TemporalMonitorNode::TemporalMonitorNode(const rclcpp::NodeOptions& options) : r
               "TemporalMonitorNode started"
               " | imu_topic=%s"
               " | lidar_topic=%s"
+              " | map_update_allowed_topic=%s"
+              " | temporal_health_topic=%s"
+              " | map_update_reason_topic=%s"
               " | summary_period_ms=%.3f"
               " | imu_gap_threshold_ms=%.3f"
               " | lidar_gap_threshold_ms=%.3f"
@@ -290,7 +315,10 @@ TemporalMonitorNode::TemporalMonitorNode(const rclcpp::NodeOptions& options) : r
               " | max_missing_prefix_ms=%.3f"
               " | max_missing_suffix_ms=%.3f"
               " | max_internal_gap_ms=%.3f",
-              imu_topic.c_str(), lidar_topic.c_str(), safe_summary_period_ms, safe_imu_gap_threshold_ms, safe_lidar_gap_threshold_ms,
+              imu_topic.c_str(), lidar_topic.c_str(),
+              map_update_allowed_topic.c_str(), temporal_health_topic.c_str(),
+              map_update_reason_topic.c_str(), safe_summary_period_ms,
+              safe_imu_gap_threshold_ms, safe_lidar_gap_threshold_ms,
               safe_lidar_scan_duration_ms, safe_lidar_min_measured_scan_duration_ms, safe_lidar_max_measured_scan_duration_ms,
               lidar_prefer_measured_header_period ? "true" : "false", lidar::ToString(parsed_lidar_stamp_policy),
               safe_expected_imu_period_ms, safe_imu_buffer_retention_ms, std::max(max_missing_prefix_ms, 0.0),
@@ -357,6 +385,23 @@ void TemporalMonitorNode::OnLidarReceived(PointCloud2Msg::ConstSharedPtr msg) {
       latest_lidar_scan_window_estimate_->window, imu_sample_buffer_.Samples());
 }
 
+void TemporalMonitorNode::PublishDiagnosticTopics(
+    const diagnostics::TemporalDiagnosticSnapshot& snapshot) {
+  BoolMsg map_update_allowed_msg;
+  map_update_allowed_msg.data =
+      snapshot.map_update_decision.map_update_allowed;
+  map_update_allowed_publisher_->publish(map_update_allowed_msg);
+
+  StringMsg temporal_health_msg;
+  temporal_health_msg.data = telemetry::ToString(snapshot.overall_status);
+  temporal_health_publisher_->publish(temporal_health_msg);
+
+  StringMsg map_update_reason_msg;
+  map_update_reason_msg.data =
+      causal_slam::policy::ToString(snapshot.map_update_decision.reason);
+  map_update_reason_publisher_->publish(map_update_reason_msg);
+}
+
 void TemporalMonitorNode::OnTimer() {
   const auto imu_summary = imu_timing_tracker_.ConsumeWindowSummary();
   const auto lidar_summary = lidar_timing_tracker_.ConsumeWindowSummary();
@@ -382,6 +427,8 @@ void TemporalMonitorNode::OnTimer() {
 
   const diagnostics::TemporalDiagnosticsBuilder diagnostics_builder;
   const auto diagnostic_snapshot = diagnostics_builder.Build(observation);
+
+  PublishDiagnosticTopics(diagnostic_snapshot);
 
   const std::int64_t now_ns = this->now().nanoseconds();
 

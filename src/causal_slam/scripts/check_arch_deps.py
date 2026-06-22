@@ -37,19 +37,24 @@ allowed_edges = {
     ("model", "lidar"),
     ("model", "telemetry"),
 
+    ("policy", "telemetry"),
+
     ("diagnostics", "model"),
     ("diagnostics", "telemetry"),
+    ("diagnostics", "policy"),
 
     ("statistics", "model"),
     ("statistics", "telemetry"),
 
     ("render", "diagnostics"),
+    ("render", "policy"),
     ("render", "statistics"),
 
     ("nodes", "coverage"),
     ("nodes", "diagnostics"),
     ("nodes", "lidar"),
     ("nodes", "model"),
+    ("nodes", "policy"),
     ("nodes", "render"),
     ("nodes", "ros_adapters"),
     ("nodes", "statistics"),
@@ -69,6 +74,10 @@ forbidden_edges = {
     ("model", "render"),
     ("model", "nodes"),
 
+    ("policy", "nodes"),
+    ("policy", "render"),
+    ("policy", "statistics"),
+    ("policy", "diagnostics"),
     ("diagnostics", "render"),
     ("diagnostics", "nodes"),
 

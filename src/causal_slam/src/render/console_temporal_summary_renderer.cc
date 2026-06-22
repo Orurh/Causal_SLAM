@@ -1,5 +1,7 @@
 #include "render/console_temporal_summary_renderer.h"
 
+#include "policy/map_update_decision.h"
+
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -42,6 +44,7 @@ void RenderWindowStatistics(std::ostringstream& out, const char* title, const ca
 
   out << "  health:"
       << " OK=" << stats.health.ok_count << " WARNING=" << stats.health.warning_count << " DEGRADED=" << stats.health.degraded_count
+      << " INVALID=" << stats.health.invalid_count
       << '\n';
 
   out << "  scan_window_sources:"
@@ -73,7 +76,16 @@ void RenderWindowStatistics(std::ostringstream& out, const char* title, const ca
 std::string ConsoleTemporalSummaryRenderer::Render(const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot) const {
   std::ostringstream out;
 
-  out << "Temporal Health: " << causal_slam::telemetry::ToString(snapshot.overall_status) << '\n';
+  out << "Temporal Health: "
+      << causal_slam::telemetry::ToString(snapshot.overall_status) << '\n';
+
+  out << "Map update:\n"
+      << "  allowed: "
+      << (snapshot.map_update_decision.map_update_allowed ? "true" : "false")
+      << '\n'
+      << "  reason: "
+      << causal_slam::policy::ToString(snapshot.map_update_decision.reason)
+      << '\n';
 
   out << "LiDAR scan window:\n";
   if (!snapshot.observation.lidar_scan_window.has_value()) {
@@ -137,7 +149,9 @@ std::string ConsoleTemporalSummaryRenderer::Render(const causal_slam::diagnostic
   out << "Issues:\n";
 
   for (const auto& issue : snapshot.issues) {
-    out << "  [" << causal_slam::diagnostics::ToString(issue.severity) << "] " << issue.title << '\n'
+    out << "  [" << causal_slam::diagnostics::ToString(issue.severity) << "] "
+        << issue.title << " | reason="
+        << causal_slam::diagnostics::ToString(issue.reason) << '\n'
         << "    Why: " << issue.explanation << '\n'
         << "    Evidence: " << issue.evidence << '\n'
         << "    Action: " << issue.suggested_action << '\n';
@@ -149,7 +163,7 @@ std::string ConsoleTemporalSummaryRenderer::Render(const causal_slam::diagnostic
 std::string ConsoleTemporalSummaryRenderer::RenderStatistics(const causal_slam::statistics::TemporalStatisticsSnapshot& snapshot) const {
   std::ostringstream out;
 
-  out << "Temporal Statistics\n";
+  out << "Temporal Statistics (historical windows)\n";
 
   RenderWindowStatistics(out, "Last 10s", snapshot.short_window);
   RenderWindowStatistics(out, "Last 60s", snapshot.medium_window);

@@ -157,6 +157,10 @@ if(BUILD_TESTING)
     tests/diagnostics/temporal_diagnostics_test.cc
   )
 
+  add_causal_slam_core_gtest(map_update_decision_test
+    tests/policy/map_update_decision_test.cc
+  )
+
   add_causal_slam_core_gtest(temporal_statistics_test
     tests/statistics/temporal_statistics_test.cc
   )
@@ -169,16 +173,17 @@ if(BUILD_TESTING)
     tests/ros_adapters/point_cloud2_time_field_extractor_test.cc
   )
 
+  add_test(
+    NAME architecture_dependency_test
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_arch_deps.py
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+
   # find_package(ament_lint_auto REQUIRED)
   # set(ament_cmake_copyright_FOUND TRUE)
   # set(ament_cmake_cpplint_FOUND TRUE)
   # ament_lint_auto_find_test_dependencies()
 endif()
 
-  add_test(
-    NAME architecture_dependency_test
-    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_arch_deps.py
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  )
 
 ament_package()

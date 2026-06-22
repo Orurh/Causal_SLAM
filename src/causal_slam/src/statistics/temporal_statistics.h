@@ -23,6 +23,7 @@ struct HealthDistribution {
   std::uint64_t ok_count{0};
   std::uint64_t warning_count{0};
   std::uint64_t degraded_count{0};
+  std::uint64_t invalid_count{0};
 };
 
 struct LidarScanWindowSourceDistribution {

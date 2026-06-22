@@ -1,5 +1,7 @@
 #include "diagnostics/temporal_diagnostics.h"
 
+#include "policy/map_update_decision.h"
+
 #include <string>
 #include <utility>
 
@@ -10,6 +12,11 @@ causal_slam::telemetry::TemporalHealthStatus MaxStatus(
     causal_slam::telemetry::TemporalHealthStatus lhs,
     causal_slam::telemetry::TemporalHealthStatus rhs) {
   using causal_slam::telemetry::TemporalHealthStatus;
+
+  if (lhs == TemporalHealthStatus::kInvalid ||
+      rhs == TemporalHealthStatus::kInvalid) {
+    return TemporalHealthStatus::kInvalid;
+  }
 
   if (lhs == TemporalHealthStatus::kDegraded ||
       rhs == TemporalHealthStatus::kDegraded) {
@@ -35,9 +42,11 @@ causal_slam::telemetry::TemporalHealthStatus StatusFromSeverity(
       return TemporalHealthStatus::kWarning;
     case TemporalDiagnosticSeverity::kDegraded:
       return TemporalHealthStatus::kDegraded;
+    case TemporalDiagnosticSeverity::kInvalid:
+      return TemporalHealthStatus::kInvalid;
   }
 
-  return TemporalHealthStatus::kDegraded;
+  return TemporalHealthStatus::kInvalid;
 }
 
 TemporalDiagnosticSeverity SeverityFromTimingHealth(
@@ -64,6 +73,7 @@ void AddTimingIssue(
 
   issues->push_back(TemporalDiagnosticIssue{
       .severity = SeverityFromTimingHealth(summary.health),
+      .reason = TemporalFaultReason::kStreamTimingUnstable,
       .title = std::string(stream_name) + " timing is not stable",
       .explanation =
           "The message stream has temporal instability in the latest summary "
@@ -100,15 +110,41 @@ const char* ToString(TemporalDiagnosticSeverity severity) {
       return "WARNING";
     case TemporalDiagnosticSeverity::kDegraded:
       return "DEGRADED";
+    case TemporalDiagnosticSeverity::kInvalid:
+      return "INVALID";
   }
 
   return "UNKNOWN";
+}
+
+const char* ToString(TemporalFaultReason reason) {
+  switch (reason) {
+    case TemporalFaultReason::kNone:
+      return "none";
+    case TemporalFaultReason::kStreamTimingUnstable:
+      return "stream_timing_unstable";
+    case TemporalFaultReason::kNoLidarScanReceivedYet:
+      return "no_lidar_scan_received_yet";
+    case TemporalFaultReason::kImuWindowIncomplete:
+      return "imu_window_incomplete";
+    case TemporalFaultReason::kLidarPointTimeUnsupported:
+      return "lidar_point_time_unsupported";
+    case TemporalFaultReason::kLidarPointTimeExtractionFailed:
+      return "lidar_point_time_extraction_failed";
+    case TemporalFaultReason::kLidarScanWindowLowConfidence:
+      return "lidar_scan_window_low_confidence";
+  }
+
+  return "unknown";
 }
 
 TemporalDiagnosticSnapshot TemporalDiagnosticsBuilder::Build(
     const causal_slam::model::TemporalObservation& observation) const {
   TemporalDiagnosticSnapshot snapshot{
       .overall_status = causal_slam::telemetry::TemporalHealthStatus::kOk,
+      .map_update_decision =
+          causal_slam::policy::DecideMapUpdate(
+              causal_slam::telemetry::TemporalHealthStatus::kOk),
       .observation = observation,
       .issues = {},
   };
@@ -123,6 +159,7 @@ TemporalDiagnosticSnapshot TemporalDiagnosticsBuilder::Build(
     AddIssueAndUpdateStatus(
         TemporalDiagnosticIssue{
             .severity = TemporalDiagnosticSeverity::kInfo,
+            .reason = TemporalFaultReason::kNoLidarScanReceivedYet,
             .title = "LiDAR scan has not been received yet",
             .explanation =
                 "IMU coverage cannot be evaluated before the first LiDAR scan "
@@ -140,6 +177,7 @@ TemporalDiagnosticSnapshot TemporalDiagnosticsBuilder::Build(
     AddIssueAndUpdateStatus(
         TemporalDiagnosticIssue{
             .severity = TemporalDiagnosticSeverity::kDegraded,
+            .reason = TemporalFaultReason::kImuWindowIncomplete,
             .title = "IMU does not properly cover the LiDAR scan window",
             .explanation =
                 "Deskew and LiDAR-inertial fusion may be unreliable when IMU "
@@ -180,6 +218,7 @@ TemporalDiagnosticSnapshot TemporalDiagnosticsBuilder::Build(
     AddIssueAndUpdateStatus(
         TemporalDiagnosticIssue{
             .severity = TemporalDiagnosticSeverity::kWarning,
+            .reason = TemporalFaultReason::kLidarPointTimeUnsupported,
             .title = "LiDAR point timestamps were detected but not trusted",
             .explanation =
                 "The cloud contains a time-like field, but the monitor "
@@ -202,6 +241,7 @@ TemporalDiagnosticSnapshot TemporalDiagnosticsBuilder::Build(
     AddIssueAndUpdateStatus(
         TemporalDiagnosticIssue{
             .severity = TemporalDiagnosticSeverity::kWarning,
+            .reason = TemporalFaultReason::kLidarPointTimeExtractionFailed,
             .title = "LiDAR point time extraction failed",
             .explanation =
                 "A supported point time field was selected, but it did not "
@@ -224,6 +264,7 @@ TemporalDiagnosticSnapshot TemporalDiagnosticsBuilder::Build(
     AddIssueAndUpdateStatus(
         TemporalDiagnosticIssue{
             .severity = TemporalDiagnosticSeverity::kWarning,
+            .reason = TemporalFaultReason::kLidarScanWindowLowConfidence,
             .title = "LiDAR scan window has low confidence",
             .explanation =
                 "The scan interval is estimated from fallback assumptions, "
@@ -244,6 +285,9 @@ TemporalDiagnosticSnapshot TemporalDiagnosticsBuilder::Build(
     snapshot.overall_status = MaxStatus(
         snapshot.overall_status, StatusFromSeverity(issue.severity));
   }
+
+  snapshot.map_update_decision =
+      causal_slam::policy::DecideMapUpdate(snapshot.overall_status);
 
   return snapshot;
 }

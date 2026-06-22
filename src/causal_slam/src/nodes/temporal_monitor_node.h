@@ -5,6 +5,8 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
+#include <std_msgs/msg/bool.hpp>
+#include <std_msgs/msg/string.hpp>
 
 #include "coverage/imu_coverage_analyzer.h"
 #include "coverage/imu_sample_buffer.h"
@@ -25,15 +27,23 @@ class TemporalMonitorNode final : public rclcpp::Node {
  private:
   using ImuMsg = sensor_msgs::msg::Imu;
   using PointCloud2Msg = sensor_msgs::msg::PointCloud2;
+  using BoolMsg = std_msgs::msg::Bool;
+  using StringMsg = std_msgs::msg::String;
 
   void OnTimer();
   void OnImuReceived(ImuMsg::ConstSharedPtr msg);
   void OnLidarReceived(PointCloud2Msg::ConstSharedPtr msg);
+  void PublishDiagnosticTopics(
+      const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot);
 
   rclcpp::TimerBase::SharedPtr timer_;
 
   rclcpp::Subscription<ImuMsg>::SharedPtr imu_subscription_;
   rclcpp::Subscription<PointCloud2Msg>::SharedPtr lidar_subscription_;
+
+  rclcpp::Publisher<BoolMsg>::SharedPtr map_update_allowed_publisher_;
+  rclcpp::Publisher<StringMsg>::SharedPtr temporal_health_publisher_;
+  rclcpp::Publisher<StringMsg>::SharedPtr map_update_reason_publisher_;
 
   causal_slam::telemetry::StreamTimingTracker imu_timing_tracker_;
   causal_slam::telemetry::StreamTimingTracker lidar_timing_tracker_;

@@ -6,6 +6,7 @@
 
 #include "telemetry/temporal_health.h"
 #include "model/temporal_observation.h"
+#include "policy/map_update_decision.h"
 
 namespace causal_slam::diagnostics {
 
@@ -13,12 +14,27 @@ enum class TemporalDiagnosticSeverity : std::uint8_t {
   kInfo,
   kWarning,
   kDegraded,
+  kInvalid,
+};
+
+enum class TemporalFaultReason : std::uint8_t {
+  kNone,
+
+  kStreamTimingUnstable,
+  kNoLidarScanReceivedYet,
+  kImuWindowIncomplete,
+
+  kLidarPointTimeUnsupported,
+  kLidarPointTimeExtractionFailed,
+  kLidarScanWindowLowConfidence,
 };
 
 [[nodiscard]] const char* ToString(TemporalDiagnosticSeverity severity);
+[[nodiscard]] const char* ToString(TemporalFaultReason reason);
 
 struct TemporalDiagnosticIssue {
   TemporalDiagnosticSeverity severity{TemporalDiagnosticSeverity::kInfo};
+  TemporalFaultReason reason{TemporalFaultReason::kNone};
 
   std::string title;
   std::string explanation;
@@ -29,6 +45,8 @@ struct TemporalDiagnosticIssue {
 struct TemporalDiagnosticSnapshot {
   causal_slam::telemetry::TemporalHealthStatus overall_status{
       causal_slam::telemetry::TemporalHealthStatus::kOk};
+
+  causal_slam::policy::MapUpdateDecision map_update_decision;
 
   causal_slam::model::TemporalObservation observation;
   std::vector<TemporalDiagnosticIssue> issues;

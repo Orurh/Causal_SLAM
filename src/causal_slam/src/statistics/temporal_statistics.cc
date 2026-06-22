@@ -70,6 +70,9 @@ void AddHealthSample(causal_slam::telemetry::TemporalHealthStatus status, Health
     case causal_slam::telemetry::TemporalHealthStatus::kDegraded:
       ++distribution->degraded_count;
       break;
+    case causal_slam::telemetry::TemporalHealthStatus::kInvalid:
+      ++distribution->invalid_count;
+      break;
   }
 }
 

@@ -195,6 +195,7 @@ TEST(TemporalStatisticsAggregatorTest, CountsHealthSourceAndConfidence) {
   EXPECT_EQ(snapshot.session.health.ok_count, 1u);
   EXPECT_EQ(snapshot.session.health.warning_count, 1u);
   EXPECT_EQ(snapshot.session.health.degraded_count, 1u);
+  EXPECT_EQ(snapshot.session.health.invalid_count, 0u);
 
   EXPECT_EQ(snapshot.session.scan_window_sources.point_time_field_count, 1u);
   EXPECT_EQ(snapshot.session.scan_window_sources.measured_header_period_count,

@@ -1,5 +1,7 @@
 #include "diagnostics/temporal_diagnostics.h"
 
+#include "policy/map_update_decision.h"
+
 #include <algorithm>
 #include <string>
 
@@ -11,6 +13,7 @@ namespace {
 namespace coverage = causal_slam::coverage;
 namespace lidar = causal_slam::lidar;
 namespace model = causal_slam::model;
+namespace policy = causal_slam::policy;
 namespace telemetry = causal_slam::telemetry;
 
 template <typename T>
@@ -125,6 +128,23 @@ bool HasIssueWithTitle(const TemporalDiagnosticSnapshot& snapshot,
   });
 }
 
+bool HasIssueWithReason(const TemporalDiagnosticSnapshot& snapshot,
+                        TemporalFaultReason reason) {
+  return std::ranges::any_of(snapshot.issues, [reason](const auto& issue) {
+    return issue.reason == reason;
+  });
+}
+
+TEST(TemporalDiagnosticsBuilderTest, FaultReasonToStringIsStable) {
+  EXPECT_STREQ(ToString(TemporalFaultReason::kNone), "none");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kStreamTimingUnstable),
+               "stream_timing_unstable");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kImuWindowIncomplete),
+               "imu_window_incomplete");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kLidarPointTimeUnsupported),
+               "lidar_point_time_unsupported");
+}
+
 TEST(TemporalDiagnosticsBuilderTest,
      SupportedPointTimeAndOkCoverageProducesOkSnapshot) {
   const TemporalDiagnosticsBuilder builder;
@@ -132,6 +152,9 @@ TEST(TemporalDiagnosticsBuilderTest,
   const auto snapshot = builder.Build(BaseOkInput());
 
   EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kOk);
+  EXPECT_TRUE(snapshot.map_update_decision.map_update_allowed);
+  EXPECT_EQ(snapshot.map_update_decision.reason,
+            policy::MapUpdateDecisionReason::kTemporalHealthOk);
   EXPECT_TRUE(snapshot.issues.empty());
 }
 
@@ -145,8 +168,13 @@ TEST(TemporalDiagnosticsBuilderTest,
   const auto snapshot = builder.Build(input);
 
   EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kWarning);
+  EXPECT_TRUE(snapshot.map_update_decision.map_update_allowed);
+  EXPECT_EQ(snapshot.map_update_decision.reason,
+            policy::MapUpdateDecisionReason::kTemporalHealthWarning);
   EXPECT_TRUE(HasIssueWithTitle(
       snapshot, "LiDAR point timestamps were detected but not trusted"));
+  EXPECT_TRUE(HasIssueWithReason(
+      snapshot, TemporalFaultReason::kLidarPointTimeUnsupported));
 }
 
 TEST(TemporalDiagnosticsBuilderTest,
@@ -177,6 +205,8 @@ TEST(TemporalDiagnosticsBuilderTest, LowConfidenceScanWindowProducesWarning) {
   EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kWarning);
   EXPECT_TRUE(HasIssueWithTitle(
       snapshot, "LiDAR scan window has low confidence"));
+  EXPECT_TRUE(HasIssueWithReason(
+      snapshot, TemporalFaultReason::kLidarScanWindowLowConfidence));
 }
 
 TEST(TemporalDiagnosticsBuilderTest, DegradedImuCoverageProducesDegraded) {
@@ -187,8 +217,13 @@ TEST(TemporalDiagnosticsBuilderTest, DegradedImuCoverageProducesDegraded) {
   const auto snapshot = builder.Build(input);
 
   EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kDegraded);
+  EXPECT_FALSE(snapshot.map_update_decision.map_update_allowed);
+  EXPECT_EQ(snapshot.map_update_decision.reason,
+            policy::MapUpdateDecisionReason::kTemporalHealthDegraded);
   EXPECT_TRUE(HasIssueWithTitle(
       snapshot, "IMU does not properly cover the LiDAR scan window"));
+  EXPECT_TRUE(HasIssueWithReason(
+      snapshot, TemporalFaultReason::kImuWindowIncomplete));
 }
 
 }  // namespace

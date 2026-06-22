@@ -8,6 +8,7 @@ enum class TemporalHealthStatus : std::uint8_t {
   kOk,
   kWarning,
   kDegraded,
+  kInvalid,
 };
 
 [[nodiscard]] inline const char* ToString(TemporalHealthStatus status) {
@@ -18,6 +19,8 @@ enum class TemporalHealthStatus : std::uint8_t {
       return "WARNING";
     case TemporalHealthStatus::kDegraded:
       return "DEGRADED";
+    case TemporalHealthStatus::kInvalid:
+      return "INVALID";
   }
 
   return "UNKNOWN";

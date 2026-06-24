@@ -120,6 +120,11 @@ void TemporalMonitorPipeline::ObserveTransforms(
   }
 }
 
+void TemporalMonitorPipeline::ObserveCloudDecision(
+    const causal_slam::statistics::CloudDecisionEvent& event) {
+  temporal_statistics_.ObserveCloudDecision(event);
+}
+
 causal_slam::diagnostics::TemporalDiagnosticSnapshot
 TemporalMonitorPipeline::BuildLatestDiagnosticSnapshot() const {
   const causal_slam::model::TemporalObservation observation{

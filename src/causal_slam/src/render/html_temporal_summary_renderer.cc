@@ -80,9 +80,15 @@ void RenderMetric(
 void RenderRow(
     std::ostringstream& out,
     const causal_slam::report::ReportRow& row) {
-  out << "<div class=\"row\">\n"
-      << "  <div class=\"row-head\">\n"
-      << "    <span class=\"row-label\">" << EscapeHtml(row.label)
+  if (row.collapsed) {
+    out << "<details class=\"row row-collapsed\">\n"
+        << "  <summary class=\"row-head\">\n";
+  } else {
+    out << "<div class=\"row\">\n"
+        << "  <div class=\"row-head\">\n";
+  }
+
+  out << "    <span class=\"row-label\">" << EscapeHtml(row.label)
       << "</span>\n";
 
   if (!row.status.empty()) {
@@ -90,7 +96,11 @@ void RenderRow(
         << "\">" << EscapeHtml(row.status) << "</span>\n";
   }
 
-  out << "  </div>\n";
+  if (row.collapsed) {
+    out << "  </summary>\n";
+  } else {
+    out << "  </div>\n";
+  }
 
   if (!row.metrics.empty()) {
     out << "  <div class=\"metrics row-metrics\">\n";
@@ -125,7 +135,11 @@ void RenderRow(
         << EscapeHtml(row.suggested_action) << "</p>\n";
   }
 
-  out << "</div>\n";
+  if (row.collapsed) {
+    out << "</details>\n";
+  } else {
+    out << "</div>\n";
+  }
 }
 
 void RenderSection(
@@ -246,6 +260,21 @@ h2 {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+.row-collapsed > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.row-collapsed > summary::-webkit-details-marker {
+  display: none;
+}
+.row-collapsed > summary::before {
+  content: "▸";
+  color: #9ca3af;
+  margin-right: 8px;
+}
+.row-collapsed[open] > summary::before {
+  content: "▾";
 }
 .row-label {
   font-weight: 650;

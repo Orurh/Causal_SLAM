@@ -78,6 +78,7 @@ ALLOWED_DEPS = {
     ("render", "policy"),
     ("render", "statistics"),
 
+    ("benchmarks", "pointcloud"),
     ("ros_adapters", "pointcloud"),
     ("ros_adapters", "transform"),
 

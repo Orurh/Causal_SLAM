@@ -6,34 +6,23 @@
 #include <string>
 #include <vector>
 
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/string.hpp>
-#include <tf2_ros/buffer.h>
-#include <tf2_ros/transform_listener.h>
 
 #include "diagnostics/temporal_diagnostics.h"
 #include "pipeline/temporal_monitor_pipeline.h"
+#include "temporal_monitor_node_parameters.h"
 
 namespace causal_slam::nodes {
 
-enum class RuntimeProfile : std::uint8_t {
-  kMinimal,
-  kDiagnostic,
-  kDebugReport,
-};
-
-struct TransformCheckConfig {
-  std::string target_frame;
-  std::string source_frame;
-};
-
 class TemporalMonitorNode final : public rclcpp::Node {
  public:
-  explicit TemporalMonitorNode(
-      const rclcpp::NodeOptions& options = rclcpp::NodeOptions{});
+  explicit TemporalMonitorNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions{});
 
  private:
   using ImuMsg = sensor_msgs::msg::Imu;
@@ -44,15 +33,10 @@ class TemporalMonitorNode final : public rclcpp::Node {
   void OnTimer();
   void OnImuReceived(ImuMsg::ConstSharedPtr msg);
   void OnLidarReceived(PointCloud2Msg::ConstSharedPtr msg);
-  void ObserveConfiguredTransformsForLidar(
-      const PointCloud2Msg& msg,
-      std::int64_t header_stamp_ns,
-      std::int64_t receive_time_ns);
-  void PublishDiagnosticTopics(
-      const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot);
-  void MaybePublishCheckedLidar(
-      const PointCloud2Msg& msg,
-      const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot);
+  void ObserveConfiguredTransformsForLidar(const PointCloud2Msg& msg, std::int64_t header_stamp_ns, std::int64_t receive_time_ns);
+  void PublishDiagnosticTopics(const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot);
+  [[nodiscard]] causal_slam::statistics::CloudForwardingDecision MaybePublishCheckedLidar(
+      const PointCloud2Msg& msg, const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot);
 
   rclcpp::TimerBase::SharedPtr timer_;
 
@@ -75,8 +59,9 @@ class TemporalMonitorNode final : public rclcpp::Node {
   std::string lidar_gate_mode_{"observe"};
   RuntimeProfile runtime_profile_{RuntimeProfile::kDebugReport};
 
-  std::optional<causal_slam::pipeline::TemporalMonitorPipeline>
-      temporal_pipeline_;
+  std::uint64_t cloud_decision_sequence_id_{0};
+
+  std::optional<causal_slam::pipeline::TemporalMonitorPipeline> temporal_pipeline_;
 };
 
 }  // namespace causal_slam::nodes

@@ -63,6 +63,9 @@ class TemporalMonitorPipeline final {
   void ObserveTransforms(
       const std::vector<causal_slam::transform::TransformLookupObservation>& inputs);
 
+  void ObserveCloudDecision(
+      const causal_slam::statistics::CloudDecisionEvent& event);
+
   [[nodiscard]] TemporalMonitorPipelineSnapshot BuildSnapshot(
       std::int64_t now_ns);
 

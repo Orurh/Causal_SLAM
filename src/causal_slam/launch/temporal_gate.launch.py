@@ -18,6 +18,14 @@ def generate_launch_description():
     )
     diagnostics_topic = LaunchConfiguration("diagnostics_topic")
     runtime_profile = LaunchConfiguration("runtime_profile")
+    html_report_path = LaunchConfiguration("html_report_path")
+
+    lidar_qos_reliability = LaunchConfiguration("lidar_qos_reliability")
+    lidar_qos_depth = LaunchConfiguration("lidar_qos_depth")
+    checked_lidar_qos_reliability = LaunchConfiguration(
+        "checked_lidar_qos_reliability"
+    )
+    checked_lidar_qos_depth = LaunchConfiguration("checked_lidar_qos_depth")
 
     lidar_gate_mode = LaunchConfiguration("lidar_gate_mode")
     tf_monitoring_enabled = LaunchConfiguration("tf_monitoring_enabled")
@@ -61,6 +69,32 @@ def generate_launch_description():
             default_value="diagnostic",
             description="minimal, diagnostic, debug_report",
         ),
+        DeclareLaunchArgument(
+            "html_report_path",
+            default_value="",
+            description="empty disables periodic HTML report writing",
+        ),
+
+        DeclareLaunchArgument(
+            "lidar_qos_reliability",
+            default_value="best_effort",
+            description="best_effort or reliable",
+        ),
+        DeclareLaunchArgument(
+            "lidar_qos_depth",
+            default_value="5",
+            description="LiDAR subscription QoS depth",
+        ),
+        DeclareLaunchArgument(
+            "checked_lidar_qos_reliability",
+            default_value="best_effort",
+            description="best_effort or reliable",
+        ),
+        DeclareLaunchArgument(
+            "checked_lidar_qos_depth",
+            default_value="5",
+            description="checked LiDAR publisher QoS depth",
+        ),
 
         DeclareLaunchArgument(
             "lidar_gate_mode",
@@ -94,6 +128,11 @@ def generate_launch_description():
                 "map_update_decision_json_topic": map_update_decision_json_topic,
                 "lidar_gate_mode": lidar_gate_mode,
                 "runtime_profile": runtime_profile,
+                "html_report_path": html_report_path,
+                "lidar_qos_reliability": lidar_qos_reliability,
+                "lidar_qos_depth": lidar_qos_depth,
+                "checked_lidar_qos_reliability": checked_lidar_qos_reliability,
+                "checked_lidar_qos_depth": checked_lidar_qos_depth,
                 "tf_monitoring_enabled": tf_monitoring_enabled,
                 "tf_target_frame": tf_target_frame,
                 "tf_source_frame": tf_source_frame,

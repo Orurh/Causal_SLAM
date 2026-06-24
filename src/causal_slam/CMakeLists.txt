@@ -85,6 +85,7 @@ ament_target_dependencies(causal_slam_ros_adapters
 add_executable(temporal_monitor_node
   src/nodes/temporal_monitor_main.cc
   src/nodes/temporal_monitor_node.cc
+  src/nodes/temporal_monitor_node_parameters.cc
 )
 
 target_link_libraries(temporal_monitor_node
@@ -139,14 +140,46 @@ ament_target_dependencies(fake_lidar_publisher_node
   sensor_msgs
 )
 
+add_executable(point_cloud_rate_probe_node
+  src/nodes/point_cloud_rate_probe_node.cc
+)
+
+ament_target_dependencies(point_cloud_rate_probe_node
+  rclcpp
+  sensor_msgs
+)
+
 install(TARGETS
   temporal_monitor_node
   fake_imu_publisher_node
   imu_fault_injection_node
   temporal_status_bridge_node
   fake_lidar_publisher_node
+  point_cloud_rate_probe_node
   DESTINATION lib/${PROJECT_NAME}
 )
+
+install(DIRECTORY
+  config
+  DESTINATION share/${PROJECT_NAME}
+)
+
+option(CAUSAL_SLAM_BUILD_BENCHMARKS "Build Causal-SLAM benchmark executables" ON)
+
+if(CAUSAL_SLAM_BUILD_BENCHMARKS)
+  add_executable(point_time_extraction_benchmark
+    tests/benchmarks/point_time_extraction_benchmark.cc
+  )
+
+  target_link_libraries(point_time_extraction_benchmark
+    causal_slam_core
+  )
+
+  install(TARGETS
+    point_time_extraction_benchmark
+    DESTINATION lib/${PROJECT_NAME}
+  )
+endif()
 
 if(BUILD_TESTING)
   find_package(Python3 REQUIRED COMPONENTS Interpreter)

@@ -139,7 +139,40 @@ StreamTimingStatistics BuildStreamTimingStatistics(StreamTimingAccumulator accum
   };
 }
 
+void IncrementBlockReason(
+    const std::string& reason,
+    std::vector<CloudBlockReasonCount>* counts) {
+  const std::string key = reason.empty() ? "unknown" : reason;
+
+  auto it = std::find_if(counts->begin(), counts->end(), [&](const auto& item) {
+    return item.reason == key;
+  });
+
+  if (it != counts->end()) {
+    ++it->count;
+    return;
+  }
+
+  counts->push_back(CloudBlockReasonCount{
+      .reason = key,
+      .count = 1,
+  });
+}
+
 }  // namespace
+
+const char* ToString(CloudForwardingDecision decision) {
+  switch (decision) {
+    case CloudForwardingDecision::kForwarded:
+      return "forwarded";
+    case CloudForwardingDecision::kBlockedWarmup:
+      return "blocked_warmup";
+    case CloudForwardingDecision::kBlockedByGate:
+      return "blocked_by_gate";
+  }
+
+  return "unknown";
+}
 
 TemporalStatisticsAggregator::TemporalStatisticsAggregator(TemporalStatisticsAggregatorConfig config) : config_(config) {}
 
@@ -159,6 +192,35 @@ void TemporalStatisticsAggregator::Observe(
   PruneRollingSamples(observed_at_ns);
 }
 
+void TemporalStatisticsAggregator::ObserveCloudDecision(
+    const CloudDecisionEvent& event) {
+  ++cloud_decision_total_count_;
+
+  switch (event.decision) {
+    case CloudForwardingDecision::kForwarded:
+      ++cloud_decision_forwarded_count_;
+      return;
+
+    case CloudForwardingDecision::kBlockedWarmup:
+      ++cloud_decision_blocked_warmup_count_;
+      break;
+
+    case CloudForwardingDecision::kBlockedByGate:
+      ++cloud_decision_blocked_by_gate_count_;
+      break;
+  }
+
+  IncrementBlockReason(event.reason, &cloud_block_reasons_);
+  recent_blocked_cloud_events_.push_back(event);
+
+  const std::uint64_t limit =
+      std::max<std::uint64_t>(config_.max_recent_blocked_cloud_events, 1);
+
+  while (recent_blocked_cloud_events_.size() > limit) {
+    recent_blocked_cloud_events_.pop_front();
+  }
+}
+
 TemporalStatisticsSnapshot TemporalStatisticsAggregator::Snapshot(std::int64_t now_ns) const {
   const std::int64_t short_cutoff_ns = now_ns - std::max<std::int64_t>(config_.short_window_ns, 0);
   const std::int64_t medium_cutoff_ns = now_ns - std::max<std::int64_t>(config_.medium_window_ns, 0);
@@ -167,6 +229,7 @@ TemporalStatisticsSnapshot TemporalStatisticsAggregator::Snapshot(std::int64_t n
   snapshot.short_window = BuildWindowStatistics(SamplesSince(short_cutoff_ns), config_.short_window_ns);
   snapshot.medium_window = BuildWindowStatistics(SamplesSince(medium_cutoff_ns), config_.medium_window_ns);
   snapshot.session = BuildWindowStatistics(session_samples_, 0);
+  snapshot.cloud_decisions = BuildCloudDecisionStatistics();
 
   return snapshot;
 }
@@ -248,6 +311,37 @@ TemporalWindowStatistics TemporalStatisticsAggregator::BuildWindowStatistics(con
   stats.imu_coverage_ratio = BuildNumericStats(std::move(imu_coverage_ratio));
   stats.imu_samples_in_window = BuildNumericStats(std::move(imu_samples_in_window));
   stats.imu_max_gap_inside_ms = BuildNumericStats(std::move(imu_max_gap_inside_ms));
+
+  return stats;
+}
+
+}  // namespace causal_slam::statistics
+namespace causal_slam::statistics {
+
+CloudDecisionStatistics
+TemporalStatisticsAggregator::BuildCloudDecisionStatistics() const {
+  CloudDecisionStatistics stats;
+  stats.total_count = cloud_decision_total_count_;
+  stats.forwarded_count = cloud_decision_forwarded_count_;
+  stats.blocked_warmup_count = cloud_decision_blocked_warmup_count_;
+  stats.blocked_by_gate_count = cloud_decision_blocked_by_gate_count_;
+  stats.blocked_count =
+      stats.blocked_warmup_count + stats.blocked_by_gate_count;
+
+  stats.block_reasons = cloud_block_reasons_;
+  std::sort(
+      stats.block_reasons.begin(),
+      stats.block_reasons.end(),
+      [](const auto& lhs, const auto& rhs) {
+        if (lhs.count != rhs.count) {
+          return lhs.count > rhs.count;
+        }
+        return lhs.reason < rhs.reason;
+      });
+
+  stats.recent_blocked_events.assign(
+      recent_blocked_cloud_events_.begin(),
+      recent_blocked_cloud_events_.end());
 
   return stats;
 }

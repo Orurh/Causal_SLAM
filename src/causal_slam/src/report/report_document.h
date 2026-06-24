@@ -13,6 +13,7 @@ struct ReportMetric {
 struct ReportRow {
   std::string label;
   std::string status;
+  bool collapsed{false};
 
   std::vector<ReportMetric> metrics;
 

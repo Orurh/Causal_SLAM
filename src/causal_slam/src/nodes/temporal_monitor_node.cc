@@ -1,4 +1,6 @@
 #include "temporal_monitor_node.h"
+#include "point_cloud_qos.hpp"
+#include "temporal_monitor_node_parameters.h"
 
 #include <algorithm>
 #include <chrono>
@@ -65,59 +67,8 @@ void LogTimingSummary(
                   << " | reason=" << summary.reason);
 }
 
-RuntimeProfile ParseRuntimeProfile(std::string_view value) {
-  if (value == "minimal") {
-    return RuntimeProfile::kMinimal;
-  }
 
-  if (value == "diagnostic") {
-    return RuntimeProfile::kDiagnostic;
-  }
 
-  if (value == "debug_report") {
-    return RuntimeProfile::kDebugReport;
-  }
-
-  // Preserve old verbose behavior for unknown values.
-  return RuntimeProfile::kDebugReport;
-}
-
-const char* ToString(RuntimeProfile profile) {
-  switch (profile) {
-    case RuntimeProfile::kMinimal:
-      return "minimal";
-    case RuntimeProfile::kDiagnostic:
-      return "diagnostic";
-    case RuntimeProfile::kDebugReport:
-      return "debug_report";
-  }
-
-  return "debug_report";
-}
-
-lidar::LidarStampPolicy ParseLidarStampPolicy(std::string_view value) {
-  if (value == "scan_start") {
-    return lidar::LidarStampPolicy::kScanStart;
-  }
-
-  if (value == "scan_middle") {
-    return lidar::LidarStampPolicy::kScanMiddle;
-  }
-
-  if (value == "scan_end") {
-    return lidar::LidarStampPolicy::kScanEnd;
-  }
-
-  return lidar::LidarStampPolicy::kScanEnd;
-}
-
-std::int64_t MillisecondsToNanoseconds(double milliseconds) {
-  constexpr double kNanosecondsPerMillisecond = 1'000'000.0;
-
-  const double safe_milliseconds = std::max(milliseconds, 0.0);
-  return static_cast<std::int64_t>(
-      safe_milliseconds * kNanosecondsPerMillisecond);
-}
 
 std::string ResolveSourceFrame(
     std::string configured_source_frame,
@@ -179,26 +130,6 @@ bool ShouldForwardLidarCloud(
   return true;
 }
 
-std::vector<TransformCheckConfig> BuildTransformChecks(
-    const std::vector<std::string>& target_frames,
-    const std::vector<std::string>& source_frames) {
-  std::vector<TransformCheckConfig> checks;
-
-  if (target_frames.size() != source_frames.size()) {
-    return checks;
-  }
-
-  checks.reserve(target_frames.size());
-
-  for (std::size_t i = 0; i < target_frames.size(); ++i) {
-    checks.push_back(TransformCheckConfig{
-        .target_frame = target_frames[i],
-        .source_frame = source_frames[i],
-    });
-  }
-
-  return checks;
-}
 
 void LogImuCoverageSummary(
     const rclcpp::Logger& logger,
@@ -242,149 +173,15 @@ void LogImuCoverageSummary(
 
 TemporalMonitorNode::TemporalMonitorNode(const rclcpp::NodeOptions& options)
     : rclcpp::Node("temporal_monitor_node", options) {
-  const auto defaults = config::MakeDefaultTemporalMonitorRuntimeDefaults();
+  const auto params = LoadTemporalMonitorNodeParameters(*this);
 
-  runtime_profile_ = ParseRuntimeProfile(
-      this->declare_parameter<std::string>("runtime_profile", "debug_report"));
+  runtime_profile_ = params.runtime_profile;
+  html_report_path_ = params.html_report_path;
+  lidar_gate_mode_ = params.lidar_gate_mode;
+  tf_monitoring_enabled_ = params.tf_monitoring_enabled;
+  transform_checks_ = params.transform_checks;
 
-  const std::string imu_topic =
-      this->declare_parameter<std::string>("imu_topic", defaults.imu_topic);
-  const std::string lidar_topic =
-      this->declare_parameter<std::string>("lidar_topic", defaults.lidar_topic);
-  const std::string checked_lidar_topic =
-      this->declare_parameter<std::string>(
-          "checked_lidar_topic", defaults.checked_lidar_topic);
-  lidar_gate_mode_ =
-      this->declare_parameter<std::string>(
-          "lidar_gate_mode", defaults.lidar_gate_mode);
-
-  const std::string map_update_allowed_topic =
-      this->declare_parameter<std::string>(
-          "map_update_allowed_topic", defaults.map_update_allowed_topic);
-  const std::string temporal_health_topic =
-      this->declare_parameter<std::string>(
-          "temporal_health_topic", defaults.temporal_health_topic);
-  const std::string map_update_reason_topic =
-      this->declare_parameter<std::string>(
-          "map_update_reason_topic", defaults.map_update_reason_topic);
-  const std::string fault_reasons_topic =
-      this->declare_parameter<std::string>(
-          "fault_reasons_topic", defaults.fault_reasons_topic);
-  const std::string map_update_decision_json_topic =
-      this->declare_parameter<std::string>(
-          "map_update_decision_json_topic",
-          defaults.map_update_decision_json_topic);
-
-  html_report_path_ =
-      this->declare_parameter<std::string>(
-          "html_report_path", defaults.html_report_path);
-
-  const double summary_period_ms =
-      this->declare_parameter<double>("summary_period_ms", defaults.summary_period_ms);
-  const double safe_summary_period_ms = std::max(summary_period_ms, defaults.limits.min_summary_period_ms);
-
-  const double imu_gap_threshold_ms =
-      this->declare_parameter<double>("imu_gap_threshold_ms", defaults.pipeline.imu_gap_threshold_ms);
-  const double safe_imu_gap_threshold_ms =
-      std::max(imu_gap_threshold_ms, defaults.limits.min_gap_threshold_ms);
-
-  const double lidar_gap_threshold_ms =
-      this->declare_parameter<double>("lidar_gap_threshold_ms", defaults.pipeline.lidar_gap_threshold_ms);
-  const double safe_lidar_gap_threshold_ms =
-      std::max(lidar_gap_threshold_ms, defaults.limits.min_gap_threshold_ms);
-
-  const double lidar_scan_duration_ms =
-      this->declare_parameter<double>("lidar_scan_duration_ms", defaults.pipeline.lidar_scan_window.fallback_scan_duration_ms);
-  const double safe_lidar_scan_duration_ms =
-      std::max(lidar_scan_duration_ms, defaults.limits.min_lidar_scan_duration_ms);
-
-  const double lidar_min_measured_scan_duration_ms =
-      this->declare_parameter<double>(
-          "lidar_min_measured_scan_duration_ms", defaults.pipeline.lidar_scan_window.min_measured_scan_duration_ms);
-  const double safe_lidar_min_measured_scan_duration_ms =
-      std::max(lidar_min_measured_scan_duration_ms, defaults.limits.min_lidar_measured_scan_duration_ms);
-
-  const double lidar_max_measured_scan_duration_ms =
-      this->declare_parameter<double>(
-          "lidar_max_measured_scan_duration_ms", defaults.pipeline.lidar_scan_window.max_measured_scan_duration_ms);
-  const double safe_lidar_max_measured_scan_duration_ms =
-      std::max(lidar_max_measured_scan_duration_ms,
-               safe_lidar_min_measured_scan_duration_ms);
-
-  const bool lidar_prefer_measured_header_period =
-      this->declare_parameter<bool>("lidar_prefer_measured_header_period", defaults.pipeline.lidar_scan_window.prefer_measured_header_period);
-
-  const std::string lidar_stamp_policy =
-      this->declare_parameter<std::string>("lidar_stamp_policy", std::string{lidar::ToString(defaults.pipeline.lidar_scan_window.stamp_policy)});
-  const auto parsed_lidar_stamp_policy =
-      ParseLidarStampPolicy(lidar_stamp_policy);
-
-  const double imu_buffer_retention_ms =
-      this->declare_parameter<double>("imu_buffer_retention_ms", defaults.imu_buffer_retention_ms);
-  const double safe_imu_buffer_retention_ms =
-      std::max(imu_buffer_retention_ms, defaults.limits.min_imu_buffer_retention_ms);
-
-  const double expected_imu_period_ms =
-      this->declare_parameter<double>("expected_imu_period_ms", defaults.expected_imu_period_ms);
-  const double safe_expected_imu_period_ms =
-      std::max(expected_imu_period_ms, defaults.limits.min_expected_imu_period_ms);
-
-  const double max_missing_prefix_ms =
-      this->declare_parameter<double>(
-          "max_missing_prefix_ms", defaults.limits.imu_coverage_missing_prefix_periods * safe_expected_imu_period_ms);
-  const double max_missing_suffix_ms =
-      this->declare_parameter<double>(
-          "max_missing_suffix_ms", defaults.limits.imu_coverage_missing_suffix_periods * safe_expected_imu_period_ms);
-  const double max_internal_gap_ms =
-      this->declare_parameter<double>(
-          "max_internal_gap_ms", defaults.limits.imu_coverage_max_internal_gap_periods * safe_expected_imu_period_ms);
-
-  tf_monitoring_enabled_ =
-      this->declare_parameter<bool>("tf_monitoring_enabled", defaults.tf_monitoring_enabled);
-
-  const std::vector<std::string> tf_target_frames =
-      this->declare_parameter<std::vector<std::string>>(
-          "tf_target_frames", defaults.tf_target_frames);
-  const std::vector<std::string> tf_source_frames =
-      this->declare_parameter<std::vector<std::string>>(
-          "tf_source_frames", defaults.tf_source_frames);
-
-  const double tf_max_transform_age_ms =
-      this->declare_parameter<double>("tf_max_transform_age_ms", defaults.pipeline.transform_age.max_transform_age_ms);
-  const double tf_max_future_tolerance_ms =
-      this->declare_parameter<double>("tf_max_future_tolerance_ms", defaults.pipeline.transform_age.max_future_tolerance_ms);
-
-  auto pipeline_config = pipeline::TemporalMonitorPipelineConfig{};
-  pipeline_config.imu_gap_threshold_ms = safe_imu_gap_threshold_ms;
-  pipeline_config.lidar_gap_threshold_ms = safe_lidar_gap_threshold_ms;
-  pipeline_config.imu_buffer_retention_ns =
-      MillisecondsToNanoseconds(safe_imu_buffer_retention_ms);
-  pipeline_config.lidar_scan_window =
-      lidar::LidarScanWindowEstimatorConfig{
-          .fallback_scan_duration_ms = safe_lidar_scan_duration_ms,
-          .min_measured_scan_duration_ms =
-              safe_lidar_min_measured_scan_duration_ms,
-          .max_measured_scan_duration_ms =
-              safe_lidar_max_measured_scan_duration_ms,
-          .stamp_policy = parsed_lidar_stamp_policy,
-          .prefer_measured_header_period =
-              lidar_prefer_measured_header_period,
-      };
-  pipeline_config.imu_coverage = coverage::ImuCoverageConfig{
-      .max_missing_prefix_ms = std::max(max_missing_prefix_ms, 0.0),
-      .max_missing_suffix_ms = std::max(max_missing_suffix_ms, 0.0),
-      .max_internal_gap_ms =
-          std::max(max_internal_gap_ms, safe_expected_imu_period_ms),
-  };
-
-  pipeline_config.transform_age.max_transform_age_ms =
-      std::max(tf_max_transform_age_ms, 0.0);
-  pipeline_config.transform_age.max_future_tolerance_ms =
-      std::max(tf_max_future_tolerance_ms, 0.0);
-
-  temporal_pipeline_.emplace(pipeline_config);
-
-  transform_checks_ = BuildTransformChecks(tf_target_frames, tf_source_frames);
+  temporal_pipeline_.emplace(params.pipeline_config);
 
   if (tf_monitoring_enabled_ && transform_checks_.empty()) {
     RCLCPP_WARN(
@@ -402,12 +199,14 @@ TemporalMonitorNode::TemporalMonitorNode(const rclcpp::NodeOptions& options)
 
   imu_subscription_ =
       this->create_subscription<ImuMsg>(
-          imu_topic, rclcpp::SensorDataQoS{},
+          params.imu_topic, rclcpp::SensorDataQoS{},
           [this](ImuMsg::ConstSharedPtr msg) { OnImuReceived(msg); });
 
   lidar_subscription_ =
       this->create_subscription<PointCloud2Msg>(
-          lidar_topic, rclcpp::SensorDataQoS{},
+          params.lidar_topic,
+          causal_slam::nodes::MakePointCloudQos(
+              params.lidar_qos_reliability, params.lidar_qos_depth),
           [this](PointCloud2Msg::ConstSharedPtr msg) { OnLidarReceived(msg); });
 
   auto diagnostic_qos = rclcpp::QoS{1};
@@ -416,29 +215,44 @@ TemporalMonitorNode::TemporalMonitorNode(const rclcpp::NodeOptions& options)
 
   map_update_allowed_publisher_ =
       this->create_publisher<BoolMsg>(
-          map_update_allowed_topic, diagnostic_qos);
+          params.map_update_allowed_topic, diagnostic_qos);
   temporal_health_publisher_ =
       this->create_publisher<StringMsg>(
-          temporal_health_topic, diagnostic_qos);
+          params.temporal_health_topic, diagnostic_qos);
   map_update_reason_publisher_ =
       this->create_publisher<StringMsg>(
-          map_update_reason_topic, diagnostic_qos);
+          params.map_update_reason_topic, diagnostic_qos);
   fault_reasons_publisher_ =
       this->create_publisher<StringMsg>(
-          fault_reasons_topic, diagnostic_qos);
+          params.fault_reasons_topic, diagnostic_qos);
   map_update_decision_json_publisher_ =
       this->create_publisher<StringMsg>(
-          map_update_decision_json_topic, diagnostic_qos);
+          params.map_update_decision_json_topic, diagnostic_qos);
 
-  if (!checked_lidar_topic.empty()) {
+  if (!params.checked_lidar_topic.empty()) {
     checked_lidar_publisher_ =
         this->create_publisher<PointCloud2Msg>(
-            checked_lidar_topic, rclcpp::SensorDataQoS{});
+            params.checked_lidar_topic,
+            causal_slam::nodes::MakePointCloudQos(
+                params.checked_lidar_qos_reliability,
+                params.checked_lidar_qos_depth));
   }
+
+  RCLCPP_INFO(
+      this->get_logger(),
+      "TemporalMonitor LiDAR QoS"
+      " | lidar_qos_reliability=%s"
+      " | lidar_qos_depth=%d"
+      " | checked_lidar_qos_reliability=%s"
+      " | checked_lidar_qos_depth=%d",
+      params.lidar_qos_reliability.c_str(),
+      params.lidar_qos_depth,
+      params.checked_lidar_qos_reliability.c_str(),
+      params.checked_lidar_qos_depth);
 
   timer_ = this->create_wall_timer(
       std::chrono::duration_cast<std::chrono::milliseconds>(
-          std::chrono::duration<double, std::milli>(safe_summary_period_ms)),
+          std::chrono::duration<double, std::milli>(params.summary_period_ms)),
       [this]() { OnTimer(); });
 
   RCLCPP_INFO(this->get_logger(),
@@ -464,23 +278,29 @@ TemporalMonitorNode::TemporalMonitorNode(const rclcpp::NodeOptions& options)
               " | max_missing_prefix_ms=%.3f"
               " | max_missing_suffix_ms=%.3f"
               " | max_internal_gap_ms=%.3f",
-              imu_topic.c_str(), lidar_topic.c_str(),
-              checked_lidar_topic.empty() ? "<disabled>" : checked_lidar_topic.c_str(),
+              params.imu_topic.c_str(),
+              params.lidar_topic.c_str(),
+              params.checked_lidar_topic.empty()
+                  ? "<disabled>"
+                  : params.checked_lidar_topic.c_str(),
               lidar_gate_mode_.c_str(),
-              map_update_allowed_topic.c_str(), temporal_health_topic.c_str(),
-              map_update_reason_topic.c_str(), fault_reasons_topic.c_str(),
-              safe_summary_period_ms,
-              safe_imu_gap_threshold_ms, safe_lidar_gap_threshold_ms,
-              safe_lidar_scan_duration_ms,
-              safe_lidar_min_measured_scan_duration_ms,
-              safe_lidar_max_measured_scan_duration_ms,
-              lidar_prefer_measured_header_period ? "true" : "false",
-              lidar::ToString(parsed_lidar_stamp_policy),
-              safe_expected_imu_period_ms, safe_imu_buffer_retention_ms,
-              std::max(max_missing_prefix_ms, 0.0),
-              std::max(max_missing_suffix_ms, 0.0),
-              std::max(max_internal_gap_ms, safe_expected_imu_period_ms));
-
+              params.map_update_allowed_topic.c_str(),
+              params.temporal_health_topic.c_str(),
+              params.map_update_reason_topic.c_str(),
+              params.fault_reasons_topic.c_str(),
+              params.summary_period_ms,
+              params.imu_gap_threshold_ms,
+              params.lidar_gap_threshold_ms,
+              params.lidar_scan_duration_ms,
+              params.lidar_min_measured_scan_duration_ms,
+              params.lidar_max_measured_scan_duration_ms,
+              params.lidar_prefer_measured_header_period ? "true" : "false",
+              lidar::ToString(params.lidar_stamp_policy),
+              params.expected_imu_period_ms,
+              params.imu_buffer_retention_ms,
+              params.max_missing_prefix_ms,
+              params.max_missing_suffix_ms,
+              params.max_internal_gap_ms);
 
   RCLCPP_INFO(this->get_logger(),
               "TF monitoring"
@@ -490,9 +310,8 @@ TemporalMonitorNode::TemporalMonitorNode(const rclcpp::NodeOptions& options)
               " | tf_max_future_tolerance_ms=%.3f",
               tf_monitoring_enabled_ ? "true" : "false",
               transform_checks_.size(),
-              std::max(tf_max_transform_age_ms, 0.0),
-              std::max(tf_max_future_tolerance_ms, 0.0));
-
+              params.tf_max_transform_age_ms,
+              params.tf_max_future_tolerance_ms);
 
   RCLCPP_INFO(this->get_logger(),
               "HTML report"
@@ -501,6 +320,86 @@ TemporalMonitorNode::TemporalMonitorNode(const rclcpp::NodeOptions& options)
               html_report_path_.empty() ? "false" : "true",
               html_report_path_.c_str());
 }
+
+namespace {
+
+std::vector<std::string> FaultReasonStrings(
+    const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot) {
+  std::vector<std::string> reasons;
+  reasons.reserve(snapshot.issues.size());
+
+  for (const auto& issue : snapshot.issues) {
+    const std::string reason = causal_slam::diagnostics::ToString(issue.reason);
+    if (reason != "none") {
+      reasons.push_back(reason);
+    }
+  }
+
+  return reasons;
+}
+
+std::string PrimaryBlockReason(
+    causal_slam::statistics::CloudForwardingDecision decision,
+    const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot) {
+  if (decision == causal_slam::statistics::CloudForwardingDecision::kForwarded) {
+    return "forwarded";
+  }
+
+  if (decision == causal_slam::statistics::CloudForwardingDecision::kBlockedWarmup) {
+    return "insufficient_imu_timing_evidence";
+  }
+
+  for (const auto& issue : snapshot.issues) {
+    const std::string reason = causal_slam::diagnostics::ToString(issue.reason);
+    if (reason != "none") {
+      return reason;
+    }
+  }
+
+  return causal_slam::policy::ToString(snapshot.map_update_decision.reason);
+}
+
+causal_slam::statistics::CloudDecisionEvent MakeCloudDecisionEvent(
+    const sensor_msgs::msg::PointCloud2& msg,
+    std::int64_t receive_time_ns,
+    std::uint64_t sequence_id,
+    causal_slam::statistics::CloudForwardingDecision decision,
+    const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot) {
+  causal_slam::statistics::CloudDecisionEvent event;
+  event.sequence_id = sequence_id;
+  event.header_stamp_ns = rclcpp::Time(msg.header.stamp).nanoseconds();
+  event.receive_time_ns = receive_time_ns;
+  event.frame_id = msg.header.frame_id;
+  event.point_count =
+      static_cast<std::uint64_t>(msg.width) * static_cast<std::uint64_t>(msg.height);
+  event.data_size_bytes = static_cast<std::uint64_t>(msg.data.size());
+  event.health = snapshot.overall_status;
+  event.map_update_allowed = snapshot.map_update_decision.map_update_allowed;
+  event.decision = decision;
+  event.reason = PrimaryBlockReason(decision, snapshot);
+  event.fault_reasons = FaultReasonStrings(snapshot);
+
+  if (snapshot.observation.lidar_scan_window.has_value()) {
+    const auto& scan_window = *snapshot.observation.lidar_scan_window;
+    event.has_scan_window = true;
+    event.scan_duration_ms = scan_window.duration_ms;
+    event.scan_window_source = causal_slam::lidar::ToString(scan_window.source);
+    event.scan_window_confidence =
+        causal_slam::lidar::ToString(scan_window.confidence);
+  }
+
+  if (snapshot.observation.imu_coverage.has_value()) {
+    const auto& imu_coverage = *snapshot.observation.imu_coverage;
+    event.has_imu_coverage = true;
+    event.imu_samples_in_window = imu_coverage.imu_count_in_window;
+    event.imu_coverage_ratio = imu_coverage.coverage_ratio;
+    event.imu_max_gap_inside_ms = imu_coverage.max_gap_inside_ms;
+  }
+
+  return event;
+}
+
+}  // namespace
 
 void TemporalMonitorNode::OnImuReceived(ImuMsg::ConstSharedPtr msg) {
   temporal_pipeline_->ObserveImu(pipeline::ImuPipelineInput{
@@ -526,7 +425,17 @@ void TemporalMonitorNode::OnLidarReceived(PointCloud2Msg::ConstSharedPtr msg) {
 
   const auto scan_snapshot = temporal_pipeline_->BuildLatestDiagnosticSnapshot();
   PublishDiagnosticTopics(scan_snapshot);
-  MaybePublishCheckedLidar(*msg, scan_snapshot);
+
+  const auto forwarding_decision =
+      MaybePublishCheckedLidar(*msg, scan_snapshot);
+
+  temporal_pipeline_->ObserveCloudDecision(
+      MakeCloudDecisionEvent(
+          *msg,
+          receive_time_ns,
+          ++cloud_decision_sequence_id_,
+          forwarding_decision,
+          scan_snapshot));
 }
 
 void TemporalMonitorNode::ObserveConfiguredTransformsForLidar(
@@ -558,11 +467,12 @@ void TemporalMonitorNode::ObserveConfiguredTransformsForLidar(
   temporal_pipeline_->ObserveTransforms(observations);
 }
 
-void TemporalMonitorNode::MaybePublishCheckedLidar(
+causal_slam::statistics::CloudForwardingDecision
+TemporalMonitorNode::MaybePublishCheckedLidar(
     const PointCloud2Msg& msg,
     const diagnostics::TemporalDiagnosticSnapshot& snapshot) {
   if (!checked_lidar_publisher_) {
-    return;
+    return causal_slam::statistics::CloudForwardingDecision::kBlockedByGate;
   }
 
   if (IsActiveLidarGateMode(lidar_gate_mode_) &&
@@ -576,7 +486,7 @@ void TemporalMonitorNode::MaybePublishCheckedLidar(
             << snapshot.observation.latest_lidar_header_stamp_ns
             << " | frame_id=" << snapshot.observation.latest_lidar_frame_id
             << " | reason=insufficient_imu_timing_evidence");
-    return;
+    return causal_slam::statistics::CloudForwardingDecision::kBlockedWarmup;
   }
 
   if (!ShouldForwardLidarCloud(lidar_gate_mode_, snapshot.overall_status)) {
@@ -590,10 +500,11 @@ void TemporalMonitorNode::MaybePublishCheckedLidar(
             << " | frame_id=" << snapshot.observation.latest_lidar_frame_id
             << " | health=" << telemetry::ToString(snapshot.overall_status)
             << " | reasons=" << diagnostics::JoinFaultReasons(snapshot.issues));
-    return;
+    return causal_slam::statistics::CloudForwardingDecision::kBlockedByGate;
   }
 
   checked_lidar_publisher_->publish(msg);
+  return causal_slam::statistics::CloudForwardingDecision::kForwarded;
 }
 
 void TemporalMonitorNode::PublishDiagnosticTopics(

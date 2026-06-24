@@ -1,0 +1,70 @@
+# Causal-SLAM temporal gate config.
+#
+# Real pipeline:
+#   lidar_topic -> temporal gate -> checked_lidar_topic
+#
+# Fake publishers are only for tests/demo. In production, set imu_topic and
+# lidar_topic to your real driver/rosbag topics.
+
+temporal_monitor:
+  ros__parameters:
+    # Input topics.
+    imu_topic: "/livox/imu"
+    lidar_topic: "/livox/lidar"
+
+    # Output checked PointCloud2 topic.
+    # Empty string disables cloud forwarding/proxy output.
+    checked_lidar_topic: "/livox/lidar_checked"
+
+    # Decision topics.
+    map_update_allowed_topic: "/causal_slam/map_update_allowed"
+    temporal_health_topic: "/causal_slam/temporal_health"
+    map_update_reason_topic: "/causal_slam/map_update_reason"
+    fault_reasons_topic: "/causal_slam/fault_reasons"
+    map_update_decision_json_topic: "/causal_slam/map_update_decision_json"
+
+    # Gate mode:
+    #   observe        - monitor only, never block clouds
+    #   drop_invalid   - block INVALID clouds
+    #   drop_degraded  - block DEGRADED and INVALID clouds
+    #   strict         - pass only OK clouds
+    lidar_gate_mode: "drop_degraded"
+
+    # Runtime profile:
+    #   minimal       - no periodic console summary
+    #   diagnostic    - compact periodic console summary
+    #   debug_report  - verbose report/debug output
+    runtime_profile: "diagnostic"
+
+    # Empty string disables periodic HTML report writing.
+    html_report_path: "/tmp/causal_slam_temporal_gate.html"
+
+    # PointCloud2 QoS.
+    # For large clouds, reliable + depth 20 is usually safer.
+    lidar_qos_reliability: "reliable"
+    lidar_qos_depth: 20
+    checked_lidar_qos_reliability: "reliable"
+    checked_lidar_qos_depth: 20
+
+    # TF check.
+    # true  - require transform tf_target_frame -> tf_source_frame
+    # false - validate only LiDAR/IMU timing
+    tf_monitoring_enabled: true
+    tf_target_frame: "odom"
+    tf_source_frame: "lidar"
+
+    # Timing thresholds.
+    expected_imu_period_ms: 20.0
+    imu_gap_threshold_ms: 500.0
+    max_missing_prefix_ms: 30.0
+    max_missing_suffix_ms: 30.0
+    max_internal_gap_ms: 50.0
+
+temporal_status_bridge:
+  ros__parameters:
+    map_update_allowed_topic: "/causal_slam/map_update_allowed"
+    temporal_health_topic: "/causal_slam/temporal_health"
+    map_update_reason_topic: "/causal_slam/map_update_reason"
+    fault_reasons_topic: "/causal_slam/fault_reasons"
+    map_update_decision_json_topic: "/causal_slam/map_update_decision_json"
+    diagnostics_topic: "/diagnostics"

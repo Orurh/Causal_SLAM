@@ -3,14 +3,19 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/msg/point_field.hpp>
 
+#include "point_cloud_qos.hpp"
+
 namespace causal_slam::nodes {
 namespace {
+
+using SteadyClock = std::chrono::steady_clock;
 
 std::string NormalizeTimeFieldMode(std::string value) {
   std::ranges::transform(value, value.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
@@ -39,6 +44,11 @@ std::int64_t MillisecondsToNanoseconds(double milliseconds) {
   return static_cast<std::int64_t>(milliseconds * nanoseconds_per_millisecond);
 }
 
+
+double DurationUs(SteadyClock::duration duration) {
+  return std::chrono::duration<double, std::micro>(duration).count();
+}
+
 }  // namespace
 
 class FakeLidarPublisherNode final : public rclcpp::Node {
@@ -62,11 +72,33 @@ class FakeLidarPublisherNode final : public rclcpp::Node {
     const double scan_duration_ms = this->declare_parameter<double>("scan_duration_ms", safe_period_ms);
     scan_duration_ms_ = std::max(scan_duration_ms, 0.0);
 
-    lidar_publisher_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(lidar_topic, rclcpp::SensorDataQoS{});
+    perf_metrics_enabled_ =
+        this->declare_parameter<bool>("perf_metrics_enabled", false);
+    const double perf_metrics_period_ms =
+        this->declare_parameter<double>("perf_metrics_period_ms", 2000.0);
+    const double safe_perf_metrics_period_ms =
+        std::max(perf_metrics_period_ms, 100.0);
+
+    const std::string qos_reliability =
+        this->declare_parameter<std::string>("qos_reliability", "best_effort");
+    const int qos_depth = std::max(
+        static_cast<int>(this->declare_parameter<int>("qos_depth", 5)),
+        1);
+
+    lidar_publisher_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
+        lidar_topic, MakePointCloudQos(qos_reliability, qos_depth));
 
     timer_ = this->create_wall_timer(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::duration<double, std::milli>(safe_period_ms)),
         [this]() { PublishCloud(); });
+
+    if (perf_metrics_enabled_) {
+      perf_metrics_timer_ = this->create_wall_timer(
+          std::chrono::duration_cast<std::chrono::milliseconds>(
+              std::chrono::duration<double, std::milli>(
+                  safe_perf_metrics_period_ms)),
+          [this]() { LogPerfMetrics(); });
+    }
 
     RCLCPP_INFO(this->get_logger(),
                 "FakeLidarPublisherNode started"
@@ -76,13 +108,27 @@ class FakeLidarPublisherNode final : public rclcpp::Node {
                 " | point_count=%u"
                 " | include_xyz_fields=%s"
                 " | time_field_mode=%s"
-                " | scan_duration_ms=%.3f",
+                " | scan_duration_ms=%.3f"
+                " | perf_metrics_enabled=%s"
+                " | qos_reliability=%s"
+                " | qos_depth=%d",
                 lidar_topic.c_str(), frame_id_.c_str(), safe_period_ms, point_count_, include_xyz_fields_ ? "true" : "false",
-                time_field_mode_.c_str(), scan_duration_ms_);
+                time_field_mode_.c_str(), scan_duration_ms_,
+                perf_metrics_enabled_ ? "true" : "false",
+                qos_reliability.c_str(), qos_depth);
   }
 
  private:
   void PublishCloud() {
+    const auto callback_started_at = SteadyClock::now();
+
+    std::optional<double> actual_period_us;
+    if (last_publish_started_at_.has_value()) {
+      actual_period_us =
+          DurationUs(callback_started_at - *last_publish_started_at_);
+    }
+    last_publish_started_at_ = callback_started_at;
+
     sensor_msgs::msg::PointCloud2 msg;
 
     const rclcpp::Time now = this->now();
@@ -102,12 +148,93 @@ class FakeLidarPublisherNode final : public rclcpp::Node {
     msg.is_bigendian = false;
     msg.is_dense = true;
 
+    const auto generation_started_at = SteadyClock::now();
     ConfigureFields(msg);
     ConfigureData(now_ns, msg);
+    const auto generation_finished_at = SteadyClock::now();
 
+    const auto publish_started_at = SteadyClock::now();
     lidar_publisher_->publish(msg);
+    const auto publish_finished_at = SteadyClock::now();
 
     ++published_count_;
+
+    RecordPerfMetrics(
+        DurationUs(generation_finished_at - generation_started_at),
+        DurationUs(publish_finished_at - publish_started_at),
+        actual_period_us,
+        msg.data.size());
+  }
+
+  void RecordPerfMetrics(
+      double generation_us,
+      double publish_call_us,
+      std::optional<double> actual_period_us,
+      std::size_t data_size_bytes) {
+    if (!perf_metrics_enabled_) {
+      return;
+    }
+
+    ++perf_window_count_;
+    perf_window_bytes_ += static_cast<std::uint64_t>(data_size_bytes);
+
+    perf_generation_total_us_ += generation_us;
+    perf_generation_max_us_ = std::max(perf_generation_max_us_, generation_us);
+
+    perf_publish_total_us_ += publish_call_us;
+    perf_publish_max_us_ = std::max(perf_publish_max_us_, publish_call_us);
+
+    if (actual_period_us.has_value()) {
+      ++perf_period_count_;
+      perf_period_total_us_ += *actual_period_us;
+      perf_period_max_us_ = std::max(perf_period_max_us_, *actual_period_us);
+    }
+  }
+
+  void LogPerfMetrics() {
+    if (!perf_metrics_enabled_) {
+      return;
+    }
+
+    if (perf_window_count_ == 0) {
+      RCLCPP_INFO(this->get_logger(),
+                  "FakeLidarPublisher metrics | published_count=%lu | "
+                  "window_count=0",
+                  published_count_);
+      return;
+    }
+
+    const double count = static_cast<double>(perf_window_count_);
+    const double period_count =
+        std::max<double>(static_cast<double>(perf_period_count_), 1.0);
+    const double mib =
+        static_cast<double>(perf_window_bytes_) / 1024.0 / 1024.0;
+
+    RCLCPP_INFO(
+        this->get_logger(),
+        "FakeLidarPublisher metrics | published_count=%lu | window_count=%lu | "
+        "window_mib=%.3f | generation_avg_ms=%.3f | generation_max_ms=%.3f | "
+        "publish_call_avg_ms=%.3f | publish_call_max_ms=%.3f | "
+        "actual_period_avg_ms=%.3f | actual_period_max_ms=%.3f",
+        published_count_,
+        perf_window_count_,
+        mib,
+        perf_generation_total_us_ / count / 1000.0,
+        perf_generation_max_us_ / 1000.0,
+        perf_publish_total_us_ / count / 1000.0,
+        perf_publish_max_us_ / 1000.0,
+        perf_period_total_us_ / period_count / 1000.0,
+        perf_period_max_us_ / 1000.0);
+
+    perf_window_count_ = 0;
+    perf_window_bytes_ = 0;
+    perf_period_count_ = 0;
+    perf_generation_total_us_ = 0.0;
+    perf_generation_max_us_ = 0.0;
+    perf_publish_total_us_ = 0.0;
+    perf_publish_max_us_ = 0.0;
+    perf_period_total_us_ = 0.0;
+    perf_period_max_us_ = 0.0;
   }
 
   void ConfigureFields(sensor_msgs::msg::PointCloud2& msg) const {
@@ -220,6 +347,7 @@ class FakeLidarPublisherNode final : public rclcpp::Node {
 
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr lidar_publisher_;
   rclcpp::TimerBase::SharedPtr timer_;
+  rclcpp::TimerBase::SharedPtr perf_metrics_timer_;
 
   std::string frame_id_{"lidar"};
   std::string time_field_mode_{"none"};
@@ -229,6 +357,20 @@ class FakeLidarPublisherNode final : public rclcpp::Node {
   double scan_duration_ms_{100.0};
 
   std::uint64_t published_count_{0};
+
+  bool perf_metrics_enabled_{false};
+  std::optional<SteadyClock::time_point> last_publish_started_at_;
+
+  std::uint64_t perf_window_count_{0};
+  std::uint64_t perf_window_bytes_{0};
+  std::uint64_t perf_period_count_{0};
+
+  double perf_generation_total_us_{0.0};
+  double perf_generation_max_us_{0.0};
+  double perf_publish_total_us_{0.0};
+  double perf_publish_max_us_{0.0};
+  double perf_period_total_us_{0.0};
+  double perf_period_max_us_{0.0};
 };
 
 }  // namespace causal_slam::nodes

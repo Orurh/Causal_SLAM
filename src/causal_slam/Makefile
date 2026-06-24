@@ -7,6 +7,9 @@ PKG := causal_slam
 PKG_DIR := $(CURDIR)
 WS_DIR := $(abspath $(PKG_DIR)/../..)
 
+GATE_CONFIG ?= $(PKG_DIR)/config/gate.env
+-include $(GATE_CONFIG)
+
 ROS_SETUP := /opt/ros/jazzy/setup.bash
 WS_SETUP := $(WS_DIR)/install/setup.bash
 
@@ -26,6 +29,11 @@ GATE_CHECKED_LIDAR_TOPIC ?= /points_checked
 GATE_TF_TARGET_FRAME ?= odom
 GATE_TF_SOURCE_FRAME ?= lidar
 GATE_MODE ?= drop_degraded
+GATE_RUNTIME_PROFILE ?= diagnostic
+GATE_HTML_REPORT_PATH ?= $(MANUAL_LOG_DIR)/temporal_gate.html
+GATE_QOS_RELIABILITY ?= best_effort
+GATE_QOS_DEPTH ?= 5
+GATE_TF_MONITORING_ENABLED ?= true
 
 WARN_RE := warning:|error:|fatal error|undefined reference|CMake Error|FAILED|not found:|Unable to find required file
 
@@ -38,7 +46,7 @@ COLCON_BUILD := \
 			-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 			-DBUILD_TESTING=$(BUILD_TESTING)
 
-.PHONY: help dirs build clean-build rebuild test arch smoke ci warnings check-warnings gate demo-healthy demo-imu-lag demo-imu-drop demo-tf-missing clean-bak clean-generated clean-tmp clean-colcon-logs clean-nested clean-local clean-all status
+.PHONY: help dirs build clean-build rebuild test arch smoke ci warnings check-warnings gate demo-healthy demo-imu-lag demo-imu-drop demo-tf-missing clean-bak clean-generated clean-tmp clean-colcon-logs clean-nested clean-local clean-all status benchmark runtime-stress
 
 help:
 	@echo "Causal-SLAM Make targets"
@@ -86,12 +94,23 @@ help:
 	@echo "  GATE_TF_TARGET_FRAME=$(GATE_TF_TARGET_FRAME)"
 	@echo "  GATE_TF_SOURCE_FRAME=$(GATE_TF_SOURCE_FRAME)"
 	@echo "  GATE_MODE=$(GATE_MODE)"
+	@echo "  GATE_CONFIG=$(GATE_CONFIG)"
+	@echo "  GATE_RUNTIME_PROFILE=$(GATE_RUNTIME_PROFILE)"
+	@echo "  GATE_HTML_REPORT_PATH=$(GATE_HTML_REPORT_PATH)"
+	@echo "  GATE_QOS_RELIABILITY=$(GATE_QOS_RELIABILITY)"
+	@echo "  GATE_QOS_DEPTH=$(GATE_QOS_DEPTH)"
+	@echo "  GATE_TF_MONITORING_ENABLED=$(GATE_TF_MONITORING_ENABLED)"
 	@echo
 	@echo "Examples:"
 	@echo "  make ci"
 	@echo "  make build JOBS=16"
 	@echo "  make clean-build BUILD_TYPE=Debug"
 	@echo "  make gate GATE_IMU_TOPIC=/livox/imu GATE_LIDAR_TOPIC=/livox/lidar GATE_CHECKED_LIDAR_TOPIC=/livox/lidar_checked"
+	@echo "  make gate GATE_RUNTIME_PROFILE=debug_report GATE_HTML_REPORT_PATH=/tmp/causal_slam_report.html"
+	@echo "  make gate GATE_QOS_RELIABILITY=reliable GATE_QOS_DEPTH=20"
+	@echo "  make gate GATE_TF_MONITORING_ENABLED=false"
+	@echo "  make gate GATE_CONFIG=config/temporal_gate.yaml"
+	@echo "  make gate GATE_CONFIG=config/gate.env"
 
 dirs:
 	mkdir -p "$(MANUAL_LOG_DIR)" "$(SMOKE_LOG_DIR)"
@@ -159,13 +178,8 @@ gate: build
 	unset AMENT_PREFIX_PATH CMAKE_PREFIX_PATH COLCON_PREFIX_PATH
 	source "$(ROS_SETUP)"
 	source "$(WS_SETUP)"
-	ros2 launch "$(PKG)" temporal_gate.launch.py \
-		imu_topic:="$(GATE_IMU_TOPIC)" \
-		lidar_topic:="$(GATE_LIDAR_TOPIC)" \
-		checked_lidar_topic:="$(GATE_CHECKED_LIDAR_TOPIC)" \
-		tf_target_frame:="$(GATE_TF_TARGET_FRAME)" \
-		tf_source_frame:="$(GATE_TF_SOURCE_FRAME)" \
-		lidar_gate_mode:="$(GATE_MODE)"
+	ros2 launch "$(PKG)" temporal_gate_config.launch.py \
+		config_file:="$(GATE_CONFIG)"
 
 demo-healthy: build
 	cd "$(WS_DIR)"
@@ -228,3 +242,26 @@ status:
 	git -C "$(PKG_DIR)" status --short
 	echo
 	tree -L 2
+
+
+# Developer performance checks.
+
+benchmark: build
+	cd "$(WS_DIR)"
+	unset AMENT_PREFIX_PATH CMAKE_PREFIX_PATH COLCON_PREFIX_PATH
+	source "$(ROS_SETUP)"
+	source "$(WS_SETUP)"
+	ros2 run "$(PKG)" point_time_extraction_benchmark
+
+runtime-stress: build
+	cd "$(WS_DIR)"
+	unset AMENT_PREFIX_PATH CMAKE_PREFIX_PATH COLCON_PREFIX_PATH
+	source "$(ROS_SETUP)"
+	source "$(WS_SETUP)"
+	CAUSAL_SLAM_RUNTIME_STRESS_GATE_MODE=observe \
+	CAUSAL_SLAM_RUNTIME_STRESS_QOS_RELIABILITY=reliable \
+	CAUSAL_SLAM_RUNTIME_STRESS_QOS_DEPTH=20 \
+	CAUSAL_SLAM_RUNTIME_STRESS_POINT_COUNT=1000000 \
+	CAUSAL_SLAM_RUNTIME_STRESS_LIDAR_PERIOD_MS=100.0 \
+	CAUSAL_SLAM_RUNTIME_STRESS_DURATION_SEC=30 \
+	./src/causal_slam/scripts/runtime_stress_temporal_gate.sh\n\n

@@ -17,6 +17,7 @@ namespace lidar = causal_slam::lidar;
 namespace model = causal_slam::model;
 namespace policy = causal_slam::policy;
 namespace telemetry = causal_slam::telemetry;
+namespace transform = causal_slam::transform;
 
 template <typename T, typename = void>
 struct HasOverallStatus : std::false_type {};
@@ -100,6 +101,68 @@ model::PointTimeDiagnostics SupportedOffsetTime() {
   return diagnostics;
 }
 
+transform::TransformAgeSummary OkTransformAge() {
+  transform::TransformAgeSummary summary;
+  summary.health = telemetry::TemporalHealthStatus::kOk;
+  summary.status = transform::TransformLookupStatus::kOk;
+  summary.target_frame = "odom";
+  summary.source_frame = "base_link";
+  summary.transform_age_ms = 10.0;
+  summary.receive_delay_ms = 5.0;
+  summary.reason = "ok";
+  return summary;
+}
+
+transform::TransformAgeSummary FailedTransformLookup() {
+  transform::TransformAgeSummary summary;
+  summary.health = telemetry::TemporalHealthStatus::kInvalid;
+  summary.status = transform::TransformLookupStatus::kLookupFailed;
+  summary.target_frame = "odom";
+  summary.source_frame = "base_link";
+  summary.transform_age_ms = 0.0;
+  summary.receive_delay_ms = 5.0;
+  summary.reason = "tf_lookup_failed";
+  summary.adapter_detail = "frame_not_found";
+  return summary;
+}
+
+transform::TransformAgeSummary ExtrapolatedTransformLookup() {
+  transform::TransformAgeSummary summary;
+  summary.health = telemetry::TemporalHealthStatus::kDegraded;
+  summary.status = transform::TransformLookupStatus::kExtrapolationRequired;
+  summary.target_frame = "odom";
+  summary.source_frame = "base_link";
+  summary.transform_age_ms = 0.0;
+  summary.receive_delay_ms = 5.0;
+  summary.reason = "tf_extrapolation_required";
+  summary.adapter_detail = "extrapolation_into_future";
+  return summary;
+}
+
+transform::TransformAgeSummary StaleTransformLookup() {
+  transform::TransformAgeSummary summary;
+  summary.health = telemetry::TemporalHealthStatus::kDegraded;
+  summary.status = transform::TransformLookupStatus::kTransformAgeTooHigh;
+  summary.target_frame = "odom";
+  summary.source_frame = "base_link";
+  summary.transform_age_ms = 120.0;
+  summary.receive_delay_ms = 5.0;
+  summary.reason = "tf_age_too_high";
+  return summary;
+}
+
+transform::TransformAgeSummary FutureTransformLookup() {
+  transform::TransformAgeSummary summary;
+  summary.health = telemetry::TemporalHealthStatus::kDegraded;
+  summary.status = transform::TransformLookupStatus::kTransformFromFuture;
+  summary.target_frame = "odom";
+  summary.source_frame = "base_link";
+  summary.transform_age_ms = -10.0;
+  summary.receive_delay_ms = 5.0;
+  summary.reason = "tf_transform_from_future";
+  return summary;
+}
+
 model::PointTimeDiagnostics RejectedFloat32Timestamp() {
   model::PointTimeDiagnostics diagnostics;
   diagnostics.has_time_candidate = true;
@@ -149,6 +212,14 @@ TEST(TemporalDiagnosticsBuilderTest, FaultReasonToStringIsStable) {
                "imu_window_incomplete");
   EXPECT_STREQ(ToString(TemporalFaultReason::kLidarPointTimeUnsupported),
                "lidar_point_time_unsupported");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kTfLookupFailed),
+               "tf_lookup_failed");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kTfExtrapolationRequired),
+               "tf_extrapolation_required");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kTfAgeTooHigh),
+               "tf_age_too_high");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kTfTransformFromFuture),
+               "tf_transform_from_future");
 }
 
 TEST(TemporalDiagnosticsBuilderTest,
@@ -233,4 +304,89 @@ TEST(TemporalDiagnosticsBuilderTest, DegradedImuCoverageProducesDegraded) {
 }
 
 }  // namespace
+
+TEST(TemporalDiagnosticsBuilderTest, OkTransformDoesNotCreateIssue) {
+  auto input = BaseOkInput();
+  input.transform_ages = {OkTransformAge()};
+
+  const TemporalDiagnosticsBuilder builder;
+  const auto snapshot = builder.Build(input);
+
+  EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kOk);
+  EXPECT_TRUE(snapshot.map_update_decision.map_update_allowed);
+  EXPECT_FALSE(HasIssueWithReason(snapshot, TemporalFaultReason::kTfLookupFailed));
+  EXPECT_FALSE(HasIssueWithReason(snapshot, TemporalFaultReason::kTfAgeTooHigh));
+}
+
+TEST(TemporalDiagnosticsBuilderTest, FailedTransformLookupProducesInvalid) {
+  auto input = BaseOkInput();
+  input.transform_ages = {FailedTransformLookup()};
+
+  const TemporalDiagnosticsBuilder builder;
+  const auto snapshot = builder.Build(input);
+
+  EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kInvalid);
+  EXPECT_FALSE(snapshot.map_update_decision.map_update_allowed);
+  EXPECT_EQ(snapshot.map_update_decision.reason,
+            policy::MapUpdateDecisionReason::kTemporalHealthInvalid);
+  EXPECT_TRUE(HasIssueWithReason(snapshot, TemporalFaultReason::kTfLookupFailed));
+}
+
+TEST(TemporalDiagnosticsBuilderTest, ExtrapolatedTransformProducesDegraded) {
+  auto input = BaseOkInput();
+  input.transform_ages = {ExtrapolatedTransformLookup()};
+
+  const TemporalDiagnosticsBuilder builder;
+  const auto snapshot = builder.Build(input);
+
+  EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kDegraded);
+  EXPECT_FALSE(snapshot.map_update_decision.map_update_allowed);
+  EXPECT_TRUE(HasIssueWithReason(
+      snapshot, TemporalFaultReason::kTfExtrapolationRequired));
+}
+
+TEST(TemporalDiagnosticsBuilderTest, StaleTransformProducesDegraded) {
+  auto input = BaseOkInput();
+  input.transform_ages = {StaleTransformLookup()};
+
+  const TemporalDiagnosticsBuilder builder;
+  const auto snapshot = builder.Build(input);
+
+  EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kDegraded);
+  EXPECT_FALSE(snapshot.map_update_decision.map_update_allowed);
+  EXPECT_TRUE(HasIssueWithReason(snapshot, TemporalFaultReason::kTfAgeTooHigh));
+}
+
+TEST(TemporalDiagnosticsBuilderTest, FutureTransformProducesDegraded) {
+  auto input = BaseOkInput();
+  input.transform_ages = {FutureTransformLookup()};
+
+  const TemporalDiagnosticsBuilder builder;
+  const auto snapshot = builder.Build(input);
+
+  EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kDegraded);
+  EXPECT_FALSE(snapshot.map_update_decision.map_update_allowed);
+  EXPECT_TRUE(HasIssueWithReason(
+      snapshot, TemporalFaultReason::kTfTransformFromFuture));
+}
+
+
+TEST(TemporalDiagnosticsBuilderTest, MissingLidarScanProducesInvalid) {
+  model::TemporalObservation input;
+  input.streams = {
+      telemetry::MakeStreamTimingDiagnostic(telemetry::TemporalStreamId::kImu, OkTiming()),
+      telemetry::MakeStreamTimingDiagnostic(telemetry::TemporalStreamId::kLidar, OkTiming()),
+  };
+  input.imu_buffer_size = 0;
+
+  const TemporalDiagnosticsBuilder builder;
+  const auto snapshot = builder.Build(input);
+
+  EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kInvalid);
+  EXPECT_FALSE(snapshot.map_update_decision.map_update_allowed);
+  EXPECT_EQ(snapshot.map_update_decision.reason,
+            policy::MapUpdateDecisionReason::kTemporalHealthInvalid);
+  EXPECT_TRUE(HasIssueWithReason(
+      snapshot, TemporalFaultReason::kNoLidarScanReceivedYet));
+}
 }  // namespace causal_slam::diagnostics

@@ -1,11 +1,21 @@
 #include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <memory>
+#include <string>
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 
 namespace causal_slam::nodes {
+namespace {
+
+std::int64_t MillisecondsToNanoseconds(double milliseconds) {
+  constexpr double kNanosecondsPerMillisecond = 1'000'000.0;
+  return static_cast<std::int64_t>(milliseconds * kNanosecondsPerMillisecond);
+}
+
+}  // namespace
 
 using namespace std::chrono_literals;
 
@@ -20,18 +30,41 @@ class FakeImuPublisherNode final : public rclcpp::Node {
     const double period_ms = this->declare_parameter<double>("period_ms", 10.0);
     const double safe_period_ms = std::max(period_ms, 1.0);
 
+    const double timestamp_shift_ms =
+        this->declare_parameter<double>("timestamp_shift_ms", 0.0);
+    timestamp_shift_ns_ = MillisecondsToNanoseconds(timestamp_shift_ms);
+
+    const int drop_every_n = this->declare_parameter<int>("drop_every_n", 0);
+    drop_every_n_ = static_cast<std::uint64_t>(std::max(drop_every_n, 0));
+
     timer_ = this->create_wall_timer(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::duration<double, std::milli>(safe_period_ms)),
         [this]() { PublishImu(); });
 
-    RCLCPP_INFO(this->get_logger(), "FakeImuPublisherNode started | imu_topic=%s | period_ms=%.3f", imu_topic.c_str(), safe_period_ms);
+    RCLCPP_INFO(this->get_logger(),
+                "FakeImuPublisherNode started"
+                " | imu_topic=%s"
+                " | period_ms=%.3f"
+                " | timestamp_shift_ms=%.3f"
+                " | drop_every_n=%lu",
+                imu_topic.c_str(),
+                safe_period_ms,
+                timestamp_shift_ms,
+                static_cast<unsigned long>(drop_every_n_));
   }
 
  private:
   void PublishImu() {
+    ++publish_attempt_count_;
+
+    if (drop_every_n_ > 0 && publish_attempt_count_ % drop_every_n_ == 0) {
+      return;
+    }
+
     sensor_msgs::msg::Imu msg;
 
-    msg.header.stamp = this->now();
+    const std::int64_t stamp_ns = this->now().nanoseconds() + timestamp_shift_ns_;
+    msg.header.stamp = rclcpp::Time(stamp_ns);
     msg.header.frame_id = "imu_link";
 
     msg.orientation.w = 1.0;
@@ -51,6 +84,10 @@ class FakeImuPublisherNode final : public rclcpp::Node {
 
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_publisher_;
   rclcpp::TimerBase::SharedPtr timer_;
+
+  std::int64_t timestamp_shift_ns_{0};
+  std::uint64_t drop_every_n_{0};
+  std::uint64_t publish_attempt_count_{0};
 
   std::uint64_t published_count_{0};
 };

@@ -5,17 +5,29 @@
 namespace causal_slam::diagnostics {
 namespace {
 
+TemporalDiagnosticIssue MakeIssue(
+    TemporalDiagnosticSeverity severity,
+    TemporalFaultReason reason,
+    const std::string& title) {
+  TemporalDiagnosticIssue issue;
+  issue.severity = severity;
+  issue.reason = reason;
+  issue.title = title;
+  issue.explanation = "test explanation";
+  issue.evidence = "test evidence";
+  issue.suggested_action = "test action";
+  return issue;
+}
+
 TEST(TemporalFaultReasonFormatterTest, EmptyIssuesProducesNone) {
   EXPECT_EQ(JoinFaultReasons({}), "none");
 }
 
 TEST(TemporalFaultReasonFormatterTest, SingleIssueProducesReason) {
   const std::vector<TemporalDiagnosticIssue> issues{
-      TemporalDiagnosticIssue{
-          .severity = TemporalDiagnosticSeverity::kDegraded,
-          .reason = TemporalFaultReason::kImuWindowIncomplete,
-          .title = "test",
-      },
+      MakeIssue(TemporalDiagnosticSeverity::kDegraded,
+                TemporalFaultReason::kImuWindowIncomplete,
+                "test"),
   };
 
   EXPECT_EQ(JoinFaultReasons(issues), "imu_window_incomplete");
@@ -23,16 +35,12 @@ TEST(TemporalFaultReasonFormatterTest, SingleIssueProducesReason) {
 
 TEST(TemporalFaultReasonFormatterTest, MultipleIssuesAreCommaSeparated) {
   const std::vector<TemporalDiagnosticIssue> issues{
-      TemporalDiagnosticIssue{
-          .severity = TemporalDiagnosticSeverity::kDegraded,
-          .reason = TemporalFaultReason::kStreamTimingUnstable,
-          .title = "stream",
-      },
-      TemporalDiagnosticIssue{
-          .severity = TemporalDiagnosticSeverity::kDegraded,
-          .reason = TemporalFaultReason::kImuWindowIncomplete,
-          .title = "coverage",
-      },
+      MakeIssue(TemporalDiagnosticSeverity::kDegraded,
+                TemporalFaultReason::kStreamTimingUnstable,
+                "stream"),
+      MakeIssue(TemporalDiagnosticSeverity::kDegraded,
+                TemporalFaultReason::kImuWindowIncomplete,
+                "coverage"),
   };
 
   EXPECT_EQ(JoinFaultReasons(issues),

@@ -26,6 +26,7 @@ catkin_package()
 
 set(CAUSAL_SLAM_COMMON_SOURCES
   ${CAUSAL_SLAM_ROOT}/src/telemetry/stream_timing_tracker.cc
+  ${CAUSAL_SLAM_ROOT}/src/transform/transform_age_analyzer.cc
 
   ${CAUSAL_SLAM_ROOT}/src/lidar/lidar_scan_timing.cc
   ${CAUSAL_SLAM_ROOT}/src/lidar/lidar_scan_window_estimator.cc

@@ -31,6 +31,7 @@ TemporalMonitorPipeline::TemporalMonitorPipeline(
     : config_(config),
       imu_sample_buffer_(std::max<std::int64_t>(
           config_.imu_buffer_retention_ns, 100'000'000LL)),
+      transform_age_analyzer_(config_.transform_age),
       temporal_statistics_(config_.statistics) {
   imu_timing_tracker_.SetGapThresholdMs(
       std::max(config_.imu_gap_threshold_ms, 1.0));
@@ -53,6 +54,9 @@ void TemporalMonitorPipeline::ObserveImu(const ImuPipelineInput& input) {
 }
 
 void TemporalMonitorPipeline::ObserveLidar(const LidarPipelineInput& input) {
+  latest_lidar_header_stamp_ns_ = input.header_stamp_ns;
+  latest_lidar_frame_id_ = input.frame_id;
+
   if (!latest_lidar_point_time_diagnostics_.has_value()) {
     const auto inspection = point_cloud2_field_inspector_.Inspect(input.fields);
     latest_lidar_point_time_diagnostics_ = BuildPointTimeDiagnostics(inspection);
@@ -98,6 +102,44 @@ void TemporalMonitorPipeline::ObserveLidar(const LidarPipelineInput& input) {
   }
 }
 
+void TemporalMonitorPipeline::ObserveTransform(
+    const causal_slam::transform::TransformLookupObservation& input) {
+  latest_transform_age_summaries_.clear();
+  latest_transform_age_summaries_.push_back(
+      transform_age_analyzer_.Analyze(input));
+}
+
+void TemporalMonitorPipeline::ObserveTransforms(
+    const std::vector<causal_slam::transform::TransformLookupObservation>& inputs) {
+  latest_transform_age_summaries_.clear();
+  latest_transform_age_summaries_.reserve(inputs.size());
+
+  for (const auto& input : inputs) {
+    latest_transform_age_summaries_.push_back(
+        transform_age_analyzer_.Analyze(input));
+  }
+}
+
+causal_slam::diagnostics::TemporalDiagnosticSnapshot
+TemporalMonitorPipeline::BuildLatestDiagnosticSnapshot() const {
+  const causal_slam::model::TemporalObservation observation{
+      .has_lidar_scan = latest_lidar_scan_window_estimate_.has_value(),
+      .latest_lidar_header_stamp_ns = latest_lidar_header_stamp_ns_,
+      .latest_lidar_frame_id = latest_lidar_frame_id_,
+      .streams = BuildTimingDiagnostics(
+          imu_timing_tracker_.CurrentWindowSummary(),
+          lidar_timing_tracker_.CurrentWindowSummary()),
+      .imu_coverage = latest_imu_coverage_summary_,
+      .lidar_scan_window = latest_lidar_scan_window_estimate_,
+      .lidar_point_time = latest_lidar_point_time_diagnostics_,
+      .transform_ages = latest_transform_age_summaries_,
+      .imu_buffer_size = imu_sample_buffer_.Size(),
+  };
+
+  const causal_slam::diagnostics::TemporalDiagnosticsBuilder diagnostics_builder;
+  return diagnostics_builder.Build(observation);
+}
+
 TemporalMonitorPipelineSnapshot TemporalMonitorPipeline::BuildSnapshot(
     std::int64_t now_ns) {
   const auto imu_summary = imu_timing_tracker_.ConsumeWindowSummary();
@@ -106,10 +148,14 @@ TemporalMonitorPipelineSnapshot TemporalMonitorPipeline::BuildSnapshot(
   const auto streams = BuildTimingDiagnostics(imu_summary, lidar_summary);
 
   const causal_slam::model::TemporalObservation observation{
+      .has_lidar_scan = latest_lidar_scan_window_estimate_.has_value(),
+      .latest_lidar_header_stamp_ns = latest_lidar_header_stamp_ns_,
+      .latest_lidar_frame_id = latest_lidar_frame_id_,
       .streams = streams,
       .imu_coverage = latest_imu_coverage_summary_,
       .lidar_scan_window = latest_lidar_scan_window_estimate_,
       .lidar_point_time = latest_lidar_point_time_diagnostics_,
+      .transform_ages = latest_transform_age_summaries_,
       .imu_buffer_size = imu_sample_buffer_.Size(),
   };
 

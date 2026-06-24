@@ -69,6 +69,7 @@ LidarPipelineInput MakeLidarInput(
   return LidarPipelineInput{
       .header_stamp_ns = header_stamp_ns,
       .receive_time_ns = receive_time_ns,
+      .frame_id = "lidar",
       .fields = {
           causal_slam::pointcloud::PointCloud2FieldInfo{
               .name = "offset_time",
@@ -127,6 +128,33 @@ TEST(TemporalMonitorPipelineTest, MissingImuCoverageRejectsMapUpdate) {
   ASSERT_TRUE(snapshot.diagnostics.observation.imu_coverage.has_value());
   EXPECT_EQ(snapshot.diagnostics.observation.imu_coverage->health,
             causal_slam::coverage::ImuCoverageHealth::kDegraded);
+}
+
+TEST(TemporalMonitorPipelineTest, TransformObservationIsStoredInSnapshot) {
+  TemporalMonitorPipeline pipeline{MakeConfig()};
+
+  causal_slam::transform::TransformLookupObservation observation;
+  observation.target_frame = "odom";
+  observation.source_frame = "base_link";
+  observation.requested_stamp_ns = Ms(1000);
+  observation.transform_stamp_ns = Ms(990);
+  observation.receive_time_ns = Ms(1010);
+  observation.lookup_success = true;
+  observation.extrapolation_required = false;
+
+  pipeline.ObserveTransform(observation);
+
+  const auto snapshot = pipeline.BuildSnapshot(Ms(1200));
+
+  ASSERT_FALSE(snapshot.diagnostics.observation.transform_ages.empty());
+  EXPECT_EQ(snapshot.diagnostics.observation.transform_ages.front().status,
+            causal_slam::transform::TransformLookupStatus::kOk);
+  EXPECT_EQ(snapshot.diagnostics.observation.transform_ages.front().target_frame,
+            "odom");
+  EXPECT_EQ(snapshot.diagnostics.observation.transform_ages.front().source_frame,
+            "base_link");
+  EXPECT_DOUBLE_EQ(
+      snapshot.diagnostics.observation.transform_ages.front().transform_age_ms, 10.0);
 }
 
 }  // namespace

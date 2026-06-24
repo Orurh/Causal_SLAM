@@ -71,6 +71,38 @@ void RenderWindowStatistics(std::ostringstream& out, const char* title, const ca
   RenderNumericStats(out, "  ", "imu_max_gap_inside_ms", stats.imu_max_gap_inside_ms);
 }
 
+
+void RenderTransformChecks(
+    std::ostringstream& out,
+    const std::vector<causal_slam::transform::TransformAgeSummary>& transform_ages) {
+  out << "TF checks:\n";
+
+  if (transform_ages.empty()) {
+    out << "  none\n";
+    return;
+  }
+
+  for (const auto& transform_age : transform_ages) {
+    out << "  " << transform_age.target_frame << " <- "
+        << transform_age.source_frame << ": "
+        << causal_slam::telemetry::ToString(transform_age.health)
+        << " | status="
+        << causal_slam::transform::ToString(transform_age.status)
+        << " | age_ms=" << transform_age.transform_age_ms
+        << " | receive_delay_ms=" << transform_age.receive_delay_ms;
+
+    if (!transform_age.reason.empty()) {
+      out << " | reason=" << transform_age.reason;
+    }
+
+    if (!transform_age.adapter_detail.empty()) {
+      out << " | detail=" << transform_age.adapter_detail;
+    }
+
+    out << '\n';
+  }
+}
+
 }  // namespace
 
 std::string ConsoleTemporalSummaryRenderer::Render(const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot) const {
@@ -125,6 +157,8 @@ std::string ConsoleTemporalSummaryRenderer::Render(const causal_slam::diagnostic
           << " | reordered=" << summary.window_reordered_count << '\n';
     }
   }
+
+  RenderTransformChecks(out, snapshot.observation.transform_ages);
 
   if (snapshot.observation.lidar_point_time.has_value() &&
       !snapshot.observation.lidar_point_time->inspection_reason.empty()) {

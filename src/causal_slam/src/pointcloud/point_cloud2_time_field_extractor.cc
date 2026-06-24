@@ -8,7 +8,6 @@
 #include <cstring>
 #include <limits>
 #include <optional>
-#include <vector>
 
 namespace causal_slam::pointcloud {
 namespace {
@@ -231,8 +230,8 @@ PointCloud2TimeFieldExtraction PointCloud2TimeFieldExtractor::Extract(
     return extraction;
   }
 
-  std::vector<std::int64_t> point_times_ns;
-  point_times_ns.reserve(extraction.point_count_total);
+  std::optional<std::int64_t> min_point_time_ns;
+  std::optional<std::int64_t> max_point_time_ns;
 
   for (std::uint32_t point_index = 0; point_index < extraction.point_count_total;
        ++point_index) {
@@ -249,24 +248,29 @@ PointCloud2TimeFieldExtraction PointCloud2TimeFieldExtractor::Extract(
       }
     }
 
-    if (point_time_ns.has_value()) {
-      point_times_ns.push_back(*point_time_ns);
+    if (!point_time_ns.has_value()) {
+      continue;
+    }
+
+    ++extraction.point_count_used;
+
+    if (!min_point_time_ns.has_value() || *point_time_ns < *min_point_time_ns) {
+      min_point_time_ns = *point_time_ns;
+    }
+
+    if (!max_point_time_ns.has_value() || *point_time_ns > *max_point_time_ns) {
+      max_point_time_ns = *point_time_ns;
     }
   }
 
-  extraction.point_count_used = static_cast<std::uint32_t>(point_times_ns.size());
-
-  if (point_times_ns.empty()) {
+  if (!min_point_time_ns.has_value() || !max_point_time_ns.has_value()) {
     extraction.reason = "no_valid_point_timestamps";
     return extraction;
   }
 
-  const auto [min_it, max_it] =
-      std::minmax_element(point_times_ns.begin(), point_times_ns.end());
-
   extraction.scan_window = causal_slam::core::TimeWindow{
-      .start_ns = *min_it,
-      .end_ns = *max_it,
+      .start_ns = *min_point_time_ns,
+      .end_ns = *max_point_time_ns,
   };
 
   extraction.has_scan_window = extraction.scan_window.IsValid();

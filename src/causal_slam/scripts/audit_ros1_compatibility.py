@@ -50,6 +50,7 @@ ROS_FREE_MODULES = {
     "render",
     "statistics",
     "telemetry",
+    "transform",
 }
 
 ROS_BOUNDARY_MODULES = {

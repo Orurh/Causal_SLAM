@@ -15,10 +15,15 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(diagnostic_msgs REQUIRED)
 find_package(builtin_interfaces REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 set(CAUSAL_SLAM_CORE_SOURCES
   src/telemetry/stream_timing_tracker.cc
+  src/transform/transform_age_analyzer.cc
 
   src/lidar/lidar_scan_timing.cc
   src/lidar/lidar_scan_window_estimator.cc
@@ -34,6 +39,11 @@ set(CAUSAL_SLAM_CORE_SOURCES
   src/statistics/temporal_statistics.cc
 
   src/pipeline/temporal_monitor_pipeline.cc
+  src/config/temporal_monitor_runtime_defaults.cc
+  src/report/temporal_report_builder.cc
+  src/platform/atomic_file_writer.cc
+  src/render/html_temporal_summary_renderer.cc
+  src/render/map_update_decision_json_renderer.cc
 
   src/render/console_temporal_summary_renderer.cc
 )
@@ -49,6 +59,7 @@ target_include_directories(causal_slam_core
 
 set(CAUSAL_SLAM_ROS_ADAPTER_SOURCES
   src/ros_adapters/point_cloud2_conversions.cc
+  src/ros_adapters/transform_lookup_adapter.cc
 )
 
 add_library(causal_slam_ros_adapters STATIC
@@ -66,6 +77,9 @@ target_link_libraries(causal_slam_ros_adapters
 
 ament_target_dependencies(causal_slam_ros_adapters
   sensor_msgs
+  geometry_msgs
+  tf2
+  tf2_ros
 )
 
 add_executable(temporal_monitor_node
@@ -83,6 +97,9 @@ ament_target_dependencies(temporal_monitor_node
   sensor_msgs
   std_msgs
   builtin_interfaces
+  geometry_msgs
+  tf2
+  tf2_ros
 )
 
 add_executable(fake_imu_publisher_node
@@ -92,6 +109,25 @@ add_executable(fake_imu_publisher_node
 ament_target_dependencies(fake_imu_publisher_node
   rclcpp
   sensor_msgs
+)
+
+add_executable(imu_fault_injection_node
+  src/nodes/imu_fault_injection_node.cc
+)
+
+ament_target_dependencies(imu_fault_injection_node
+  rclcpp
+  sensor_msgs
+)
+
+add_executable(temporal_status_bridge_node
+  src/nodes/temporal_status_bridge_node.cc
+)
+
+ament_target_dependencies(temporal_status_bridge_node
+  rclcpp
+  std_msgs
+  diagnostic_msgs
 )
 
 add_executable(fake_lidar_publisher_node
@@ -106,6 +142,8 @@ ament_target_dependencies(fake_lidar_publisher_node
 install(TARGETS
   temporal_monitor_node
   fake_imu_publisher_node
+  imu_fault_injection_node
+  temporal_status_bridge_node
   fake_lidar_publisher_node
   DESTINATION lib/${PROJECT_NAME}
 )
@@ -174,6 +212,30 @@ if(BUILD_TESTING)
     tests/statistics/temporal_statistics_test.cc
   )
 
+  add_causal_slam_core_gtest(console_temporal_summary_renderer_test
+    tests/render/console_temporal_summary_renderer_test.cc
+  )
+
+  add_causal_slam_core_gtest(html_temporal_summary_renderer_test
+    tests/render/html_temporal_summary_renderer_test.cc
+  )
+
+  add_causal_slam_core_gtest(map_update_decision_json_renderer_test
+    tests/render/map_update_decision_json_renderer_test.cc
+  )
+
+  add_causal_slam_core_gtest(atomic_file_writer_test
+    tests/platform/atomic_file_writer_test.cc
+  )
+
+  add_causal_slam_core_gtest(temporal_monitor_runtime_defaults_test
+    tests/config/temporal_monitor_runtime_defaults_test.cc
+  )
+
+  add_causal_slam_core_gtest(temporal_report_builder_test
+    tests/report/temporal_report_builder_test.cc
+  )
+
   add_causal_slam_core_gtest(point_cloud2_field_inspector_core_test
     tests/pointcloud/point_cloud2_field_inspector_test.cc
   )
@@ -184,6 +246,10 @@ if(BUILD_TESTING)
 
   add_causal_slam_core_gtest(temporal_monitor_pipeline_test
     tests/pipeline/temporal_monitor_pipeline_test.cc
+  )
+
+  add_causal_slam_core_gtest(transform_age_analyzer_test
+    tests/transform/transform_age_analyzer_test.cc
   )
 
   add_test(
@@ -210,5 +276,9 @@ if(BUILD_TESTING)
   # ament_lint_auto_find_test_dependencies()
 endif()
 
+
+install(DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}
+)
 
 ament_package()

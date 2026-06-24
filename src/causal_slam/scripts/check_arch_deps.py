@@ -20,9 +20,21 @@ INTERNAL_MODULES = {
     "ros_adapters",
     "statistics",
     "telemetry",
+    "transform",
 }
 
 ALLOWED_DEPS = {
+    ("nodes", "platform"),
+    ("report", "transform"),
+    ("report", "telemetry"),
+    ("report", "policy"),
+    ("report", "lidar"),
+    ("report", "coverage"),
+    ("report", "statistics"),
+    ("report", "diagnostics"),
+    ("render", "report"),
+    ("config", "pipeline"),
+    ("nodes", "config"),
     ("coverage", "core"),
 
     ("diagnostics", "model"),
@@ -34,6 +46,8 @@ ALLOWED_DEPS = {
     ("model", "coverage"),
     ("model", "lidar"),
     ("model", "telemetry"),
+    ("model", "transform"),
+
 
     ("nodes", "coverage"),
     ("nodes", "diagnostics"),
@@ -53,6 +67,8 @@ ALLOWED_DEPS = {
     ("pipeline", "pointcloud"),
     ("pipeline", "statistics"),
     ("pipeline", "telemetry"),
+    ("pipeline", "transform"),
+
 
     ("pointcloud", "core"),
 
@@ -63,9 +79,12 @@ ALLOWED_DEPS = {
     ("render", "statistics"),
 
     ("ros_adapters", "pointcloud"),
+    ("ros_adapters", "transform"),
 
     ("statistics", "model"),
     ("statistics", "telemetry"),
+
+    ("transform", "telemetry"),
 
     # ROS1 Noetic adapter boundary.
     # It is intentionally outside the shared ROS-free core.
@@ -77,6 +96,8 @@ ALLOWED_DEPS = {
     ("ros1_adapter", "policy"),
     ("ros1_adapter", "render"),
     ("ros1_adapter", "telemetry"),
+    ("ros1_adapter", "transform"),
+
 }
 
 ROS_FACING_INCLUDE_PREFIXES = (

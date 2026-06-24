@@ -49,6 +49,22 @@ causal_slam::telemetry::TemporalHealthStatus StatusFromSeverity(
   return TemporalHealthStatus::kInvalid;
 }
 
+TemporalDiagnosticSeverity SeverityFromTemporalHealth(
+    causal_slam::telemetry::TemporalHealthStatus health) {
+  switch (health) {
+    case causal_slam::telemetry::TemporalHealthStatus::kOk:
+      return TemporalDiagnosticSeverity::kInfo;
+    case causal_slam::telemetry::TemporalHealthStatus::kWarning:
+      return TemporalDiagnosticSeverity::kWarning;
+    case causal_slam::telemetry::TemporalHealthStatus::kDegraded:
+      return TemporalDiagnosticSeverity::kDegraded;
+    case causal_slam::telemetry::TemporalHealthStatus::kInvalid:
+      return TemporalDiagnosticSeverity::kInvalid;
+  }
+
+  return TemporalDiagnosticSeverity::kInvalid;
+}
+
 TemporalDiagnosticSeverity SeverityFromTimingHealth(
     causal_slam::telemetry::TimingHealth health) {
   switch (health) {
@@ -93,11 +109,107 @@ void AddTimingIssue(
   });
 }
 
+TemporalFaultReason FaultReasonFromTransformStatus(
+    causal_slam::transform::TransformLookupStatus status) {
+  switch (status) {
+    case causal_slam::transform::TransformLookupStatus::kOk:
+      return TemporalFaultReason::kNone;
+    case causal_slam::transform::TransformLookupStatus::kLookupFailed:
+      return TemporalFaultReason::kTfLookupFailed;
+    case causal_slam::transform::TransformLookupStatus::kExtrapolationRequired:
+      return TemporalFaultReason::kTfExtrapolationRequired;
+    case causal_slam::transform::TransformLookupStatus::kTransformAgeTooHigh:
+      return TemporalFaultReason::kTfAgeTooHigh;
+    case causal_slam::transform::TransformLookupStatus::kTransformFromFuture:
+      return TemporalFaultReason::kTfTransformFromFuture;
+  }
+
+  return TemporalFaultReason::kNone;
+}
+
+std::string TitleFromTransformStatus(
+    causal_slam::transform::TransformLookupStatus status) {
+  switch (status) {
+    case causal_slam::transform::TransformLookupStatus::kOk:
+      return "TF transform is temporally valid";
+    case causal_slam::transform::TransformLookupStatus::kLookupFailed:
+      return "TF lookup failed for the sensor timestamp";
+    case causal_slam::transform::TransformLookupStatus::kExtrapolationRequired:
+      return "TF lookup required extrapolation";
+    case causal_slam::transform::TransformLookupStatus::kTransformAgeTooHigh:
+      return "TF transform age is too high";
+    case causal_slam::transform::TransformLookupStatus::kTransformFromFuture:
+      return "TF transform timestamp is in the future";
+  }
+
+  return "TF transform is not temporally valid";
+}
+
+std::string SuggestedActionFromTransformStatus(
+    causal_slam::transform::TransformLookupStatus status) {
+  switch (status) {
+    case causal_slam::transform::TransformLookupStatus::kOk:
+      return "No action required.";
+    case causal_slam::transform::TransformLookupStatus::kLookupFailed:
+      return "Check TF publishers, frame names, static transforms, and whether "
+             "the requested timestamp is available in the TF buffer.";
+    case causal_slam::transform::TransformLookupStatus::kExtrapolationRequired:
+      return "Check sensor timestamp source, TF publication latency, and clock "
+             "synchronization. Avoid using transforms outside the known TF "
+             "buffer range.";
+    case causal_slam::transform::TransformLookupStatus::kTransformAgeTooHigh:
+      return "Check transform publisher rate, odometry latency, TF buffer age, "
+             "and whether the SLAM pipeline is using stale transforms.";
+    case causal_slam::transform::TransformLookupStatus::kTransformFromFuture:
+      return "Check clock domains, timestamp source, rosbag playback timing, "
+             "and whether transforms are being stamped ahead of sensor data.";
+  }
+
+  return "Check TF timing and frame configuration.";
+}
+
 void AddIssueAndUpdateStatus(TemporalDiagnosticIssue issue,
                              TemporalDiagnosticSnapshot* snapshot) {
   snapshot->overall_status = MaxStatus(
       snapshot->overall_status, StatusFromSeverity(issue.severity));
   snapshot->issues.push_back(std::move(issue));
+}
+
+void AddTransformIssue(
+    const causal_slam::transform::TransformAgeSummary& summary,
+    TemporalDiagnosticSnapshot* snapshot) {
+  if (summary.status == causal_slam::transform::TransformLookupStatus::kOk) {
+    return;
+  }
+
+  const auto reason = FaultReasonFromTransformStatus(summary.status);
+  if (reason == TemporalFaultReason::kNone) {
+    return;
+  }
+
+  AddIssueAndUpdateStatus(
+      TemporalDiagnosticIssue{
+          .severity = SeverityFromTemporalHealth(summary.health),
+          .reason = reason,
+          .title = TitleFromTransformStatus(summary.status),
+          .explanation =
+              "The transform lookup result is not temporally safe for the "
+              "sensor measurement timestamp.",
+          .evidence =
+              "target_frame=" + summary.target_frame +
+              ", source_frame=" + summary.source_frame +
+              ", status=" +
+              std::string(causal_slam::transform::ToString(summary.status)) +
+              ", transform_age_ms=" +
+              std::to_string(summary.transform_age_ms) +
+              ", receive_delay_ms=" +
+              std::to_string(summary.receive_delay_ms) +
+              ", adapter_detail=" + summary.adapter_detail +
+              ", reason=" + summary.reason,
+          .suggested_action =
+              SuggestedActionFromTransformStatus(summary.status),
+      },
+      snapshot);
 }
 
 }  // namespace
@@ -133,6 +245,14 @@ const char* ToString(TemporalFaultReason reason) {
       return "lidar_point_time_extraction_failed";
     case TemporalFaultReason::kLidarScanWindowLowConfidence:
       return "lidar_scan_window_low_confidence";
+    case TemporalFaultReason::kTfLookupFailed:
+      return "tf_lookup_failed";
+    case TemporalFaultReason::kTfExtrapolationRequired:
+      return "tf_extrapolation_required";
+    case TemporalFaultReason::kTfAgeTooHigh:
+      return "tf_age_too_high";
+    case TemporalFaultReason::kTfTransformFromFuture:
+      return "tf_transform_from_future";
   }
 
   return "unknown";
@@ -158,7 +278,7 @@ TemporalDiagnosticSnapshot TemporalDiagnosticsBuilder::Build(
   if (!observation.imu_coverage.has_value()) {
     AddIssueAndUpdateStatus(
         TemporalDiagnosticIssue{
-            .severity = TemporalDiagnosticSeverity::kInfo,
+            .severity = TemporalDiagnosticSeverity::kInvalid,
             .reason = TemporalFaultReason::kNoLidarScanReceivedYet,
             .title = "LiDAR scan has not been received yet",
             .explanation =
@@ -279,6 +399,10 @@ TemporalDiagnosticSnapshot TemporalDiagnosticsBuilder::Build(
                 "measured header period.",
         },
         &snapshot);
+  }
+
+  for (const auto& transform_age : observation.transform_ages) {
+    AddTransformIssue(transform_age, &snapshot);
   }
 
   for (const auto& issue : snapshot.issues) {

@@ -48,6 +48,7 @@ class StreamTimingTracker final {
   void SetGapThresholdMs(double threshold_ms);
 
   [[nodiscard]] TimingSummary LifetimeSummary() const;
+  [[nodiscard]] TimingSummary CurrentWindowSummary() const;
   [[nodiscard]] TimingSummary ConsumeWindowSummary();
 
  private:

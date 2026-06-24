@@ -27,6 +27,11 @@ enum class TemporalFaultReason : std::uint8_t {
   kLidarPointTimeUnsupported,
   kLidarPointTimeExtractionFailed,
   kLidarScanWindowLowConfidence,
+
+  kTfLookupFailed,
+  kTfExtrapolationRequired,
+  kTfAgeTooHigh,
+  kTfTransformFromFuture,
 };
 
 [[nodiscard]] const char* ToString(TemporalDiagnosticSeverity severity);

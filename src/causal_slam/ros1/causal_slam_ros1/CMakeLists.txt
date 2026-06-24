@@ -41,9 +41,9 @@ set(CAUSAL_SLAM_COMMON_SOURCES
   ${CAUSAL_SLAM_ROOT}/src/diagnostics/temporal_fault_reason_formatter.cc
   ${CAUSAL_SLAM_ROOT}/src/statistics/temporal_statistics.cc
 
-  ${CAUSAL_SLAM_ROOT}/src/pipeline/temporal_monitor_pipeline.cc
+  ${CAUSAL_SLAM_ROOT}/src/application/temporal_monitor/temporal_monitor_pipeline.cc
 
-  ${CAUSAL_SLAM_ROOT}/src/render/console_temporal_summary_renderer.cc
+  ${CAUSAL_SLAM_ROOT}/src/presentation/render/console_temporal_summary_renderer.cc
 )
 
 add_library(causal_slam_ros1_core STATIC

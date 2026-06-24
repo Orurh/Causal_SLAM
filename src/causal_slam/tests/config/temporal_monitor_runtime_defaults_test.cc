@@ -1,4 +1,4 @@
-#include "config/temporal_monitor_runtime_defaults.h"
+#include "application/temporal_monitor/temporal_monitor_runtime_defaults.h"
 
 #include <gtest/gtest.h>
 

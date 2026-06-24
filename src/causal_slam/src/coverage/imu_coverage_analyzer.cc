@@ -1,5 +1,7 @@
 #include "coverage/imu_coverage_analyzer.h"
 
+#include "domain/time/time_units.h"
+
 #include <algorithm>
 #include <cstdint>
 #include <utility>
@@ -7,12 +9,6 @@
 
 namespace causal_slam::coverage {
 namespace {
-
-constexpr double kNanosecondsPerMillisecond = 1'000'000.0;
-
-double NanosecondsToMilliseconds(const std::int64_t nanoseconds) {
-  return static_cast<double>(nanoseconds) / kNanosecondsPerMillisecond;
-}
 
 double ClampRatio(const double value) {
   return std::clamp(value, 0.0, 1.0);
@@ -29,7 +25,7 @@ double MaxGapInsideMilliseconds(const std::vector<std::int64_t>& stamps) {
     max_gap_ns = std::max(max_gap_ns, stamps[i] - stamps[i - 1]);
   }
 
-  return NanosecondsToMilliseconds(max_gap_ns);
+  return causal_slam::core::NanosecondsToMilliseconds(max_gap_ns);
 }
 
 ImuCoverageSummary EvaluateCoverageHealth(
@@ -99,7 +95,7 @@ ImuCoverageSummary ImuCoverageAnalyzer::AnalyzeStamps(
   std::sort(stamps.begin(), stamps.end());
 
   const double scan_duration_ms =
-      NanosecondsToMilliseconds(scan_window.DurationNs());
+      causal_slam::core::NanosecondsToMilliseconds(scan_window.DurationNs());
 
   if (stamps.empty()) {
     return ImuCoverageSummary{
@@ -117,9 +113,11 @@ ImuCoverageSummary ImuCoverageAnalyzer::AnalyzeStamps(
   const std::int64_t last_imu_ns = stamps.back();
 
   const double missing_prefix_ms =
-      NanosecondsToMilliseconds(first_imu_ns - scan_window.start_ns);
+      causal_slam::core::NanosecondsToMilliseconds(
+          first_imu_ns - scan_window.start_ns);
   const double missing_suffix_ms =
-      NanosecondsToMilliseconds(scan_window.end_ns - last_imu_ns);
+      causal_slam::core::NanosecondsToMilliseconds(
+          scan_window.end_ns - last_imu_ns);
   const double max_gap_inside_ms = MaxGapInsideMilliseconds(stamps);
 
   const double covered_ms =

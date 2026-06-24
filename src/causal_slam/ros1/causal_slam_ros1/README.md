@@ -145,7 +145,7 @@ _max_internal_gap_ms:=100.0
 Shared ROS-free logic lives in:
 
 ~~~text
-src/pipeline/
+src/application/temporal_monitor/
 src/pointcloud/
 src/coverage/
 src/diagnostics/

@@ -1,4 +1,4 @@
-#include "pipeline/temporal_monitor_pipeline.h"
+#include "application/temporal_monitor/temporal_monitor_pipeline.h"
 
 #include <cstdint>
 #include <cstring>

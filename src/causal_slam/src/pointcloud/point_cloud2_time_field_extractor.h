@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <string>
 
-#include "core/time_window.h"
+#include "domain/time/time_window.h"
 #include "pointcloud/point_cloud2_field_inspector.h"
 
 namespace causal_slam::pointcloud {

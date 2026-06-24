@@ -5,7 +5,7 @@
 #include <utility>
 #include <vector>
 
-#include "core/time_window.h"
+#include "domain/time/time_window.h"
 
 namespace causal_slam::coverage {
 

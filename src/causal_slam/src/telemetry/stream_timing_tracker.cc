@@ -1,5 +1,7 @@
 #include "stream_timing_tracker.h"
 
+#include "domain/time/time_units.h"
+
 #include <algorithm>
 #include <cstdint>
 #include <utility>
@@ -8,12 +10,6 @@ namespace causal_slam::telemetry {
 namespace {
 
 constexpr double kMinGapThresholdMs = 1.0;
-constexpr double kNanosecondsPerMillisecond = 1'000'000.0;
-
-double NanosecondsToMilliseconds(std::int64_t nanoseconds) {
-  return static_cast<double>(nanoseconds) / kNanosecondsPerMillisecond;
-}
-
 std::int64_t AbsNanoseconds(std::int64_t value) {
   return value < 0 ? -value : value;
 }
@@ -66,13 +62,13 @@ const char* ToString(TimingHealth health) {
 void StreamTimingTracker::SetGapThresholdMs(double threshold_ms) {
   const double safe_threshold_ms = std::max(threshold_ms, kMinGapThresholdMs);
   gap_threshold_ns_ = static_cast<std::int64_t>(
-      safe_threshold_ms * kNanosecondsPerMillisecond);
+      static_cast<double>(core::MillisecondsToNanoseconds(safe_threshold_ms)));
 }
 
 void StreamTimingTracker::Observe(const TimingSample& sample) {
   const std::int64_t delay_ns = sample.receive_time_ns - sample.header_stamp_ns;
 
-  last_delay_ms_ = NanosecondsToMilliseconds(delay_ns);
+  last_delay_ms_ = core::NanosecondsToMilliseconds(delay_ns);
   delay_sum_ms_ += last_delay_ms_;
   max_delay_ms_ = std::max(max_delay_ms_, last_delay_ms_);
 
@@ -90,18 +86,18 @@ void StreamTimingTracker::Observe(const TimingSample& sample) {
       ++gap_count_;
       ++window_gap_count_;
 
-      const double gap_ms = NanosecondsToMilliseconds(period_ns);
+      const double gap_ms = core::NanosecondsToMilliseconds(period_ns);
       max_gap_ms_ = std::max(max_gap_ms_, gap_ms);
 
       last_period_ms_ = gap_ms;
       previous_period_ns_.reset();
     } else {
-      last_period_ms_ = NanosecondsToMilliseconds(period_ns);
+      last_period_ms_ = core::NanosecondsToMilliseconds(period_ns);
 
       if (previous_period_ns_.has_value()) {
         const std::int64_t jitter_ns =
             AbsNanoseconds(period_ns - *previous_period_ns_);
-        last_jitter_ms_ = NanosecondsToMilliseconds(jitter_ns);
+        last_jitter_ms_ = core::NanosecondsToMilliseconds(jitter_ns);
         max_jitter_ms_ = std::max(max_jitter_ms_, last_jitter_ms_);
         window_max_jitter_ms_ = std::max(window_max_jitter_ms_, last_jitter_ms_);
       }

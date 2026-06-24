@@ -1,5 +1,7 @@
 #include "pointcloud/point_cloud2_time_field_extractor.h"
 
+#include "domain/time/time_units.h"
+
 #include "pointcloud/point_cloud2_datatype.h"
 
 #include <algorithm>
@@ -12,8 +14,6 @@
 namespace causal_slam::pointcloud {
 namespace {
 
-constexpr std::int64_t kNanosecondsPerSecond = 1'000'000'000LL;
-constexpr double kNanosecondsPerSecondDouble = 1'000'000'000.0;
 
 std::optional<std::int64_t> SecondsToNanoseconds(double seconds) {
   if (!std::isfinite(seconds)) {
@@ -22,17 +22,17 @@ std::optional<std::int64_t> SecondsToNanoseconds(double seconds) {
 
   constexpr double max_seconds =
       static_cast<double>(std::numeric_limits<std::int64_t>::max()) /
-      kNanosecondsPerSecondDouble;
+      core::kNanosecondsPerSecond;
   constexpr double min_seconds =
       static_cast<double>(std::numeric_limits<std::int64_t>::min()) /
-      kNanosecondsPerSecondDouble;
+      core::kNanosecondsPerSecond;
 
   if (seconds > max_seconds || seconds < min_seconds) {
     return std::nullopt;
   }
 
   return static_cast<std::int64_t>(
-      std::llround(seconds * kNanosecondsPerSecondDouble));
+      core::SecondsToNanoseconds(seconds));
 }
 
 std::uint32_t PointCount(const PointCloud2CloudView& cloud) {

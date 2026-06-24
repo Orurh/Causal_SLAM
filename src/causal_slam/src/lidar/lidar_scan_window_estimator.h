@@ -4,7 +4,7 @@
 #include <optional>
 #include <string>
 
-#include "core/time_window.h"
+#include "domain/time/time_window.h"
 #include "lidar/lidar_scan_timing.h"
 
 namespace causal_slam::lidar {

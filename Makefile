@@ -4,8 +4,8 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 PKG := causal_slam
-PKG_DIR := $(CURDIR)
-WS_DIR := $(abspath $(PKG_DIR)/../..)
+PKG_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+WS_DIR := $(PKG_DIR)
 
 GATE_CONFIG ?= $(PKG_DIR)/config/gate.env
 -include $(GATE_CONFIG)
@@ -39,6 +39,7 @@ WARN_RE := warning:|error:|fatal error|undefined reference|CMake Error|FAILED|no
 
 COLCON_BUILD := \
 	colcon build \
+		--base-paths "$(WS_DIR)" \
 		--packages-select $(PKG) \
 		--parallel-workers $(COLCON_WORKERS) \
 		--event-handlers console_direct+ \

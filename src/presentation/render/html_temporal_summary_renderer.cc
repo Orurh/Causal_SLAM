@@ -6,6 +6,7 @@
 
 #include "presentation/report/report_document.h"
 #include "presentation/report/temporal_report_builder.h"
+#include "domain/policy/map_update_decision.h"
 
 namespace causal_slam::render {
 namespace {

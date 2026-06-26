@@ -5,6 +5,10 @@
 #include "domain/statistics/temporal_statistics.h"
 #include "presentation/report/report_document.h"
 
+namespace causal_slam::policy {
+struct MapUpdateDecision;
+}  // namespace causal_slam::policy
+
 namespace causal_slam::report {
 
 class TemporalReportBuilder final {

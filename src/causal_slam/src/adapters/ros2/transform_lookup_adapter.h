@@ -5,7 +5,7 @@
 
 #include <tf2_ros/buffer.h>
 
-#include "transform/transform_lookup_observation.h"
+#include "domain/sensors/transform/transform_lookup_observation.h"
 
 namespace causal_slam::ros_adapters {
 

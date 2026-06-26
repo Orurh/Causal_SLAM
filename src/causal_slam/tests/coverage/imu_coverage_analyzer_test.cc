@@ -1,4 +1,4 @@
-#include "coverage/imu_coverage_analyzer.h"
+#include "domain/sensors/imu/imu_coverage_analyzer.h"
 
 #include <cstdint>
 #include <vector>

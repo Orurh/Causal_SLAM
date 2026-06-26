@@ -42,17 +42,19 @@ shared core/pipeline
 These modules must stay reusable by both ROS1 and ROS2:
 
 ~~~text
-src/core/
-src/coverage/
-src/diagnostics/
-src/lidar/
-src/model/
-src/pipeline/
-src/pointcloud/
-src/policy/
-src/render/
-src/statistics/
-src/telemetry/
+src/domain/time/
+src/domain/sensors/imu/
+src/domain/diagnostics/
+src/domain/sensors/lidar/
+src/domain/model/
+src/application/temporal_monitor/
+src/domain/sensors/pointcloud/
+src/domain/policy/
+src/presentation/render/
+src/domain/statistics/
+src/domain/telemetry/
+src/apps/ros2/
+src/adapters/ros2/
 ~~~
 
 They may use standard C++ and internal Causal-SLAM types.
@@ -75,8 +77,8 @@ geometry_msgs/
 ROS2-specific code belongs here:
 
 ~~~text
-src/nodes/
-src/ros_adapters/
+src/apps/ros2/
+src/adapters/ros2/
 ~~~
 
 ROS2 code may include:

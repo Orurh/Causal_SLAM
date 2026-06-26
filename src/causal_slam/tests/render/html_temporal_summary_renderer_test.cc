@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "policy/map_update_decision.h"
+#include "domain/policy/map_update_decision.h"
 
 namespace causal_slam::render {
 namespace {
@@ -17,20 +17,20 @@ namespace transform = causal_slam::transform;
 diagnostics::TemporalDiagnosticSnapshot MakeSnapshot() {
   diagnostics::TemporalDiagnosticSnapshot snapshot;
   snapshot.overall_status = telemetry::TemporalHealthStatus::kOk;
-  snapshot.map_update_decision =
-      policy::DecideMapUpdate(telemetry::TemporalHealthStatus::kOk);
   return snapshot;
+}
+
+causal_slam::policy::MapUpdateDecision MakeDecision() {
+  return causal_slam::policy::DecideMapUpdate(causal_slam::telemetry::TemporalHealthStatus::kOk);
 }
 
 TEST(HtmlTemporalSummaryRendererTest, RendersStandaloneHtmlPage) {
   const HtmlTemporalSummaryRenderer renderer;
 
-  const auto html = renderer.RenderPage(
-      MakeSnapshot(), causal_slam::statistics::TemporalStatisticsSnapshot{});
+  const auto html = renderer.RenderPage(MakeSnapshot(), MakeDecision(), causal_slam::statistics::TemporalStatisticsSnapshot{});
 
   EXPECT_NE(html.find("<!doctype html>"), std::string::npos);
-  EXPECT_NE(html.find("<title>Causal-SLAM Temporal Report</title>"),
-            std::string::npos);
+  EXPECT_NE(html.find("<title>Causal-SLAM Temporal Report</title>"), std::string::npos);
   EXPECT_NE(html.find("Temporal Health"), std::string::npos);
   EXPECT_NE(html.find("Map update"), std::string::npos);
   EXPECT_NE(html.find("Temporal Statistics"), std::string::npos);
@@ -50,12 +50,11 @@ TEST(HtmlTemporalSummaryRendererTest, EscapesUnsafeText) {
   snapshot.observation.transform_ages.push_back(summary);
 
   const HtmlTemporalSummaryRenderer renderer;
-  const auto html = renderer.RenderDiagnostics(snapshot);
+  const auto html = renderer.RenderDiagnostics(snapshot, MakeDecision());
 
   EXPECT_EQ(html.find("odom<script>"), std::string::npos);
   EXPECT_NE(html.find("odom&lt;script&gt;"), std::string::npos);
-  EXPECT_NE(html.find("bad &lt;frame&gt; &amp; &quot;quoted&quot;"),
-            std::string::npos);
+  EXPECT_NE(html.find("bad &lt;frame&gt; &amp; &quot;quoted&quot;"), std::string::npos);
 }
 
 TEST(HtmlTemporalSummaryRendererTest, RendersTfChecksFromReportDocument) {
@@ -72,7 +71,7 @@ TEST(HtmlTemporalSummaryRendererTest, RendersTfChecksFromReportDocument) {
   snapshot.observation.transform_ages.push_back(summary);
 
   const HtmlTemporalSummaryRenderer renderer;
-  const auto html = renderer.RenderDiagnostics(snapshot);
+  const auto html = renderer.RenderDiagnostics(snapshot, MakeDecision());
 
   EXPECT_NE(html.find("TF checks"), std::string::npos);
   EXPECT_NE(html.find("odom &lt;- lidar"), std::string::npos);

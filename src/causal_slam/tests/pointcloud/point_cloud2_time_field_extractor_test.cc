@@ -1,6 +1,6 @@
-#include "pointcloud/point_cloud2_time_field_extractor.h"
+#include "domain/sensors/pointcloud/point_cloud2_time_field_extractor.h"
 
-#include "pointcloud/point_cloud2_datatype.h"
+#include "domain/sensors/pointcloud/point_cloud2_datatype.h"
 
 #include <cstdint>
 #include <cstring>

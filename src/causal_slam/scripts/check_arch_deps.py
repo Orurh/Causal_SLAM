@@ -31,6 +31,15 @@ PATH_MODULE_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
     (("src", "presentation", "render"), "render"),
 
     (("src", "domain", "time"), "core"),
+    (("src", "domain", "model"), "model"),
+    (("src", "domain", "telemetry"), "telemetry"),
+    (("src", "domain", "sensors", "transform"), "transform"),
+    (("src", "domain", "sensors", "lidar"), "lidar"),
+    (("src", "domain", "sensors", "imu"), "coverage"),
+    (("src", "domain", "sensors", "pointcloud"), "pointcloud"),
+    (("src", "domain", "diagnostics"), "diagnostics"),
+    (("src", "domain", "policy"), "policy"),
+    (("src", "domain", "statistics"), "statistics"),
 
     (("ros1",), "ros1_adapter"),
 )
@@ -47,6 +56,15 @@ INCLUDE_MODULE_RULES: tuple[tuple[str, str], ...] = (
     ("presentation/render/", "render"),
 
     ("domain/time/", "core"),
+    ("domain/model/", "model"),
+    ("domain/telemetry/", "telemetry"),
+    ("domain/sensors/transform/", "transform"),
+    ("domain/sensors/lidar/", "lidar"),
+    ("domain/sensors/imu/", "coverage"),
+    ("domain/sensors/pointcloud/", "pointcloud"),
+    ("domain/diagnostics/", "diagnostics"),
+    ("domain/policy/", "policy"),
+    ("domain/statistics/", "statistics"),
 )
 
 INTERNAL_MODULES = {
@@ -102,6 +120,7 @@ ALLOWED_DEPS = {
     ("pipeline", "lidar"),
     ("pipeline", "model"),
     ("pipeline", "pointcloud"),
+    ("pipeline", "policy"),
     ("pipeline", "statistics"),
     ("pipeline", "telemetry"),
     ("pipeline", "transform"),

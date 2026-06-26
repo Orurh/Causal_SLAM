@@ -6,7 +6,6 @@
 
 #include <rclcpp/node.hpp>
 
-#include "lidar/lidar_scan_window_estimator.h"
 #include "application/temporal_monitor/temporal_monitor_pipeline.h"
 
 namespace causal_slam::nodes {

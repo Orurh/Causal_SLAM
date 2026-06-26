@@ -9,8 +9,8 @@
 #include <vector>
 
 #include "application/temporal_monitor/temporal_monitor_runtime_defaults.h"
-#include "coverage/imu_coverage_analyzer.h"
-#include "lidar/lidar_scan_window_estimator.h"
+#include "domain/sensors/imu/imu_coverage_analyzer.h"
+#include "domain/sensors/lidar/lidar_scan_window_estimator.h"
 
 namespace causal_slam::nodes {
 namespace {

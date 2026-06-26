@@ -1,4 +1,4 @@
-#include "coverage/imu_sample_buffer.h"
+#include "domain/sensors/imu/imu_sample_buffer.h"
 
 #include <cstdint>
 

@@ -1,6 +1,6 @@
-#include "pointcloud/point_cloud2_field_inspector.h"
+#include "domain/sensors/pointcloud/point_cloud2_field_inspector.h"
 
-#include "pointcloud/point_cloud2_datatype.h"
+#include "domain/sensors/pointcloud/point_cloud2_datatype.h"
 
 #include <cstdint>
 #include <string>

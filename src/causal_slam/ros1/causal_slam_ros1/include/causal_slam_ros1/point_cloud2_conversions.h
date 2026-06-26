@@ -6,8 +6,8 @@
 #include <ros/time.h>
 #include <sensor_msgs/PointCloud2.h>
 
-#include "pointcloud/point_cloud2_field_inspector.h"
-#include "pointcloud/point_cloud2_time_field_extractor.h"
+#include "domain/sensors/pointcloud/point_cloud2_field_inspector.h"
+#include "domain/sensors/pointcloud/point_cloud2_time_field_extractor.h"
 
 namespace causal_slam_ros1 {
 

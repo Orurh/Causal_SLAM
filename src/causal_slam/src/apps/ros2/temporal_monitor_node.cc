@@ -11,13 +11,13 @@
 
 #include "adapters/ros2/point_cloud2_conversions.h"
 #include "adapters/ros2/transform_lookup_adapter.h"
-#include "coverage/imu_coverage_analyzer.h"
-#include "diagnostics/temporal_fault_reason_formatter.h"
-#include "lidar/lidar_scan_window_estimator.h"
-#include "model/temporal_observation.h"
+#include "domain/diagnostics/temporal_fault_reason_formatter.h"
+#include "domain/model/temporal_observation.h"
+#include "domain/policy/lidar_cloud_gate.h"
+#include "domain/policy/map_update_decision.h"
+#include "domain/sensors/imu/imu_coverage_analyzer.h"
+#include "domain/sensors/lidar/lidar_scan_window_estimator.h"
 #include "platform/atomic_file_writer.h"
-#include "policy/lidar_cloud_gate.h"
-#include "policy/map_update_decision.h"
 #include "presentation/render/console_temporal_summary_renderer.h"
 #include "presentation/render/html_temporal_summary_renderer.h"
 #include "presentation/render/map_update_decision_json_renderer.h"
@@ -230,7 +230,8 @@ std::vector<std::string> FaultReasonStrings(const causal_slam::diagnostics::Temp
 }
 
 std::string PrimaryBlockReason(causal_slam::statistics::CloudForwardingDecision decision,
-                               const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot) {
+                               const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot,
+                               const causal_slam::policy::MapUpdateDecision& map_update_decision) {
   if (decision == causal_slam::statistics::CloudForwardingDecision::kForwarded) {
     return "forwarded";
   }
@@ -246,13 +247,14 @@ std::string PrimaryBlockReason(causal_slam::statistics::CloudForwardingDecision 
     }
   }
 
-  return causal_slam::policy::ToString(snapshot.map_update_decision.reason);
+  return causal_slam::policy::ToString(map_update_decision.reason);
 }
 
 causal_slam::statistics::CloudDecisionEvent MakeCloudDecisionEvent(const sensor_msgs::msg::PointCloud2& msg, std::int64_t receive_time_ns,
                                                                    std::uint64_t sequence_id,
                                                                    causal_slam::statistics::CloudForwardingDecision decision,
-                                                                   const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot) {
+                                                                   const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot,
+                                                                   const causal_slam::policy::MapUpdateDecision& map_update_decision) {
   causal_slam::statistics::CloudDecisionEvent event;
   event.sequence_id = sequence_id;
   event.header_stamp_ns = rclcpp::Time(msg.header.stamp).nanoseconds();
@@ -261,9 +263,9 @@ causal_slam::statistics::CloudDecisionEvent MakeCloudDecisionEvent(const sensor_
   event.point_count = static_cast<std::uint64_t>(msg.width) * static_cast<std::uint64_t>(msg.height);
   event.data_size_bytes = static_cast<std::uint64_t>(msg.data.size());
   event.health = snapshot.overall_status;
-  event.map_update_allowed = snapshot.map_update_decision.map_update_allowed;
+  event.map_update_allowed = map_update_decision.map_update_allowed;
   event.decision = decision;
-  event.reason = PrimaryBlockReason(decision, snapshot);
+  event.reason = PrimaryBlockReason(decision, snapshot, map_update_decision);
   event.fault_reasons = FaultReasonStrings(snapshot);
 
   if (snapshot.observation.lidar_scan_window.has_value()) {
@@ -309,12 +311,14 @@ void TemporalMonitorNode::OnLidarReceived(PointCloud2Msg::ConstSharedPtr msg) {
   ObserveConfiguredTransformsForLidar(*msg, header_stamp_ns, receive_time_ns);
 
   const auto scan_snapshot = temporal_pipeline_->BuildLatestDiagnosticSnapshot();
-  PublishDiagnosticTopics(scan_snapshot);
+  const auto scan_map_update_decision = causal_slam::policy::DecideMapUpdate(scan_snapshot.overall_status);
+
+  PublishDiagnosticTopics(scan_snapshot, scan_map_update_decision);
 
   const auto forwarding_decision = MaybePublishCheckedLidar(*msg, scan_snapshot);
 
-  temporal_pipeline_->ObserveCloudDecision(
-      MakeCloudDecisionEvent(*msg, receive_time_ns, ++cloud_decision_sequence_id_, forwarding_decision, scan_snapshot));
+  temporal_pipeline_->ObserveCloudDecision(MakeCloudDecisionEvent(*msg, receive_time_ns, ++cloud_decision_sequence_id_, forwarding_decision,
+                                                                  scan_snapshot, scan_map_update_decision));
 }
 
 void TemporalMonitorNode::ObserveConfiguredTransformsForLidar(const PointCloud2Msg& msg, std::int64_t header_stamp_ns,
@@ -376,9 +380,10 @@ causal_slam::statistics::CloudForwardingDecision TemporalMonitorNode::MaybePubli
   return causal_slam::statistics::CloudForwardingDecision::kForwarded;
 }
 
-void TemporalMonitorNode::PublishDiagnosticTopics(const diagnostics::TemporalDiagnosticSnapshot& snapshot) {
+void TemporalMonitorNode::PublishDiagnosticTopics(const diagnostics::TemporalDiagnosticSnapshot& snapshot,
+                                                  const policy::MapUpdateDecision& map_update_decision) {
   BoolMsg map_update_allowed_msg;
-  map_update_allowed_msg.data = snapshot.map_update_decision.map_update_allowed;
+  map_update_allowed_msg.data = map_update_decision.map_update_allowed;
   map_update_allowed_publisher_->publish(map_update_allowed_msg);
 
   StringMsg temporal_health_msg;
@@ -386,7 +391,8 @@ void TemporalMonitorNode::PublishDiagnosticTopics(const diagnostics::TemporalDia
   temporal_health_publisher_->publish(temporal_health_msg);
 
   StringMsg map_update_reason_msg;
-  map_update_reason_msg.data = causal_slam::policy::ToString(snapshot.map_update_decision.reason);
+  map_update_reason_msg.data = causal_slam::policy::ToString(map_update_decision.reason);
+
   map_update_reason_publisher_->publish(map_update_reason_msg);
 
   StringMsg fault_reasons_msg;
@@ -394,7 +400,7 @@ void TemporalMonitorNode::PublishDiagnosticTopics(const diagnostics::TemporalDia
   fault_reasons_publisher_->publish(fault_reasons_msg);
 
   StringMsg decision_json_msg;
-  decision_json_msg.data = render::RenderMapUpdateDecisionJson(snapshot);
+  decision_json_msg.data = render::RenderMapUpdateDecisionJson(snapshot, map_update_decision);
   map_update_decision_json_publisher_->publish(decision_json_msg);
 }
 
@@ -406,16 +412,15 @@ void TemporalMonitorNode::OnTimer() {
   const std::int64_t now_ns = this->now().nanoseconds();
   const auto snapshot = temporal_pipeline_->BuildSnapshot(now_ns);
 
-  PublishDiagnosticTopics(snapshot.diagnostics);
+  PublishDiagnosticTopics(snapshot.diagnostics, snapshot.map_update_decision);
 
   if (runtime_profile_ == RuntimeProfile::kDiagnostic) {
-    RCLCPP_INFO_STREAM(
-        this->get_logger(), "Temporal gate summary"
-                                << " | profile=" << ToString(runtime_profile_)
-                                << " | health=" << telemetry::ToString(snapshot.diagnostics.overall_status)
-                                << " | allowed=" << (snapshot.diagnostics.map_update_decision.map_update_allowed ? "true" : "false")
-                                << " | reason=" << causal_slam::policy::ToString(snapshot.diagnostics.map_update_decision.reason)
-                                << " | fault_reasons=" << diagnostics::JoinFaultReasons(snapshot.diagnostics.issues));
+    RCLCPP_INFO_STREAM(this->get_logger(), "Temporal gate summary"
+                                               << " | profile=" << ToString(runtime_profile_)
+                                               << " | health=" << telemetry::ToString(snapshot.diagnostics.overall_status)
+                                               << " | allowed=" << (snapshot.map_update_decision.map_update_allowed ? "true" : "false")
+                                               << " | reason=" << causal_slam::policy::ToString(snapshot.map_update_decision.reason)
+                                               << " | fault_reasons=" << diagnostics::JoinFaultReasons(snapshot.diagnostics.issues));
     return;
   }
 
@@ -427,14 +432,13 @@ void TemporalMonitorNode::OnTimer() {
                         snapshot.diagnostics.observation.lidar_scan_window, snapshot.diagnostics.observation.imu_buffer_size);
 
   const render::ConsoleTemporalSummaryRenderer renderer;
-  RCLCPP_INFO_STREAM(this->get_logger(), "\n" << renderer.Render(snapshot.diagnostics) << '\n'
+  RCLCPP_INFO_STREAM(this->get_logger(), "\n" << renderer.Render(snapshot.diagnostics, snapshot.map_update_decision) << '\n'
                                               << renderer.RenderStatistics(snapshot.statistics));
 
   if (!html_report_path_.empty()) {
     const render::HtmlTemporalSummaryRenderer html_renderer;
-    const auto result =
-        platform::WriteTextFileAtomically(html_report_path_, html_renderer.RenderPage(snapshot.diagnostics, snapshot.statistics));
-
+    const auto result = platform::WriteTextFileAtomically(
+        html_report_path_, html_renderer.RenderPage(snapshot.diagnostics, snapshot.map_update_decision, snapshot.statistics));
     if (!result.ok) {
       RCLCPP_WARN(this->get_logger(), "Failed to write HTML temporal report | path=%s | error=%s", html_report_path_.c_str(),
                   result.error.c_str());

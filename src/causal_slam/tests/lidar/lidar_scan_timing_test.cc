@@ -1,4 +1,4 @@
-#include "lidar/lidar_scan_timing.h"
+#include "domain/sensors/lidar/lidar_scan_timing.h"
 
 #include <cstdint>
 

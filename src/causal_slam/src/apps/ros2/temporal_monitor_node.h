@@ -14,9 +14,9 @@
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/string.hpp>
 
-#include "diagnostics/temporal_diagnostics.h"
+#include "domain/diagnostics/temporal_diagnostics.h"
 #include "application/temporal_monitor/temporal_monitor_pipeline.h"
-#include "policy/lidar_cloud_gate.h"
+#include "domain/policy/lidar_cloud_gate.h"
 #include "temporal_monitor_node_parameters.h"
 
 namespace causal_slam::nodes {
@@ -35,7 +35,9 @@ class TemporalMonitorNode final : public rclcpp::Node {
   void OnImuReceived(ImuMsg::ConstSharedPtr msg);
   void OnLidarReceived(PointCloud2Msg::ConstSharedPtr msg);
   void ObserveConfiguredTransformsForLidar(const PointCloud2Msg& msg, std::int64_t header_stamp_ns, std::int64_t receive_time_ns);
-  void PublishDiagnosticTopics(const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot);
+  void PublishDiagnosticTopics(
+      const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot,
+      const causal_slam::policy::MapUpdateDecision& map_update_decision);
   [[nodiscard]] causal_slam::statistics::CloudForwardingDecision MaybePublishCheckedLidar(
       const PointCloud2Msg& msg, const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot);
 

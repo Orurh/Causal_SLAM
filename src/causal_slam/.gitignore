@@ -1,20 +1,9 @@
-# Local accidental colcon/cmake outputs inside package source dir.
 build/
 install/
 log/
-
-# Temporary patch/backups.
-*.bak
-*.bak_*
-*.orig
-*.rej
-
-# Python/cache noise.
-__pycache__/
-*.py[cod]
-.pytest_cache/
-
-# Editor/OS noise.
+.cache/
 .vscode/
 .idea/
-.DS_Store
+*.pyc
+__pycache__/
+compile_commands.json

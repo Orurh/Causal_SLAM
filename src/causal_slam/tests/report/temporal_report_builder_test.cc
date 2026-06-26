@@ -5,7 +5,7 @@
 
 #include <gtest/gtest.h>
 
-#include "policy/map_update_decision.h"
+#include "domain/policy/map_update_decision.h"
 
 namespace causal_slam::report {
 namespace {
@@ -15,13 +15,9 @@ namespace policy = causal_slam::policy;
 namespace telemetry = causal_slam::telemetry;
 namespace transform = causal_slam::transform;
 
-const ReportSection* FindSection(
-    const ReportDocument& document,
-    const std::string& id) {
-  const auto it = std::find_if(
-      document.sections.begin(),
-      document.sections.end(),
-      [&](const ReportSection& section) { return section.id == id; });
+const ReportSection* FindSection(const ReportDocument& document, const std::string& id) {
+  const auto it =
+      std::find_if(document.sections.begin(), document.sections.end(), [&](const ReportSection& section) { return section.id == id; });
 
   if (it == document.sections.end()) {
     return nullptr;
@@ -33,8 +29,6 @@ const ReportSection* FindSection(
 diagnostics::TemporalDiagnosticSnapshot MakeDiagnosticSnapshot() {
   diagnostics::TemporalDiagnosticSnapshot snapshot;
   snapshot.overall_status = telemetry::TemporalHealthStatus::kOk;
-  snapshot.map_update_decision =
-      policy::DecideMapUpdate(telemetry::TemporalHealthStatus::kOk);
   return snapshot;
 }
 
@@ -54,7 +48,12 @@ TEST(TemporalReportBuilderTest, BuildsTransformChecksSection) {
   snapshot.observation.transform_ages.push_back(summary);
 
   const TemporalReportBuilder builder;
-  const auto document = builder.BuildDiagnosticsReport(snapshot);
+  const causal_slam::policy::MapUpdateDecision decision{
+      .map_update_allowed = false,
+      .reason = causal_slam::policy::MapUpdateDecisionReason::kTemporalHealthDegraded,
+  };
+
+  const auto document = builder.BuildDiagnosticsReport(snapshot, decision);
 
   const auto* section = FindSection(document, "tf_checks");
   ASSERT_NE(section, nullptr);
@@ -68,8 +67,7 @@ TEST(TemporalReportBuilderTest, BuildsTransformChecksSection) {
 
 TEST(TemporalReportBuilderTest, BuildsStatisticsWindowsAsSections) {
   const TemporalReportBuilder builder;
-  const auto document =
-      builder.BuildStatisticsReport(causal_slam::statistics::TemporalStatisticsSnapshot{});
+  const auto document = builder.BuildStatisticsReport(causal_slam::statistics::TemporalStatisticsSnapshot{});
 
   EXPECT_EQ(document.title, "Temporal Statistics (historical windows)");
   EXPECT_NE(FindSection(document, "last_10s"), nullptr);

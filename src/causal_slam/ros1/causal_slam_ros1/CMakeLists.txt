@@ -25,21 +25,21 @@ set(CAUSAL_SLAM_ROOT
 catkin_package()
 
 set(CAUSAL_SLAM_COMMON_SOURCES
-  ${CAUSAL_SLAM_ROOT}/src/telemetry/stream_timing_tracker.cc
-  ${CAUSAL_SLAM_ROOT}/src/transform/transform_age_analyzer.cc
+  ${CAUSAL_SLAM_ROOT}/src/domain/telemetry/stream_timing_tracker.cc
+  ${CAUSAL_SLAM_ROOT}/src/domain/sensors/transform/transform_age_analyzer.cc
 
-  ${CAUSAL_SLAM_ROOT}/src/lidar/lidar_scan_timing.cc
-  ${CAUSAL_SLAM_ROOT}/src/lidar/lidar_scan_window_estimator.cc
+  ${CAUSAL_SLAM_ROOT}/src/domain/sensors/lidar/lidar_scan_timing.cc
+  ${CAUSAL_SLAM_ROOT}/src/domain/sensors/lidar/lidar_scan_window_estimator.cc
 
-  ${CAUSAL_SLAM_ROOT}/src/pointcloud/point_cloud2_field_inspector.cc
-  ${CAUSAL_SLAM_ROOT}/src/pointcloud/point_cloud2_time_field_extractor.cc
+  ${CAUSAL_SLAM_ROOT}/src/domain/sensors/pointcloud/point_cloud2_field_inspector.cc
+  ${CAUSAL_SLAM_ROOT}/src/domain/sensors/pointcloud/point_cloud2_time_field_extractor.cc
 
-  ${CAUSAL_SLAM_ROOT}/src/coverage/imu_coverage_analyzer.cc
-  ${CAUSAL_SLAM_ROOT}/src/coverage/imu_sample_buffer.cc
+  ${CAUSAL_SLAM_ROOT}/src/domain/sensors/imu/imu_coverage_analyzer.cc
+  ${CAUSAL_SLAM_ROOT}/src/domain/sensors/imu/imu_sample_buffer.cc
 
-  ${CAUSAL_SLAM_ROOT}/src/diagnostics/temporal_diagnostics.cc
-  ${CAUSAL_SLAM_ROOT}/src/diagnostics/temporal_fault_reason_formatter.cc
-  ${CAUSAL_SLAM_ROOT}/src/statistics/temporal_statistics.cc
+  ${CAUSAL_SLAM_ROOT}/src/domain/diagnostics/temporal_diagnostics.cc
+  ${CAUSAL_SLAM_ROOT}/src/domain/diagnostics/temporal_fault_reason_formatter.cc
+  ${CAUSAL_SLAM_ROOT}/src/domain/statistics/temporal_statistics.cc
 
   ${CAUSAL_SLAM_ROOT}/src/application/temporal_monitor/temporal_monitor_pipeline.cc
 

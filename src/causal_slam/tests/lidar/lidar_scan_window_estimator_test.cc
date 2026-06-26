@@ -1,4 +1,4 @@
-#include "lidar/lidar_scan_window_estimator.h"
+#include "domain/sensors/lidar/lidar_scan_window_estimator.h"
 
 #include <cstdint>
 

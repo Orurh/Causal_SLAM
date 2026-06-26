@@ -6,8 +6,8 @@
 #include <builtin_interfaces/msg/time.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 
-#include "pointcloud/point_cloud2_field_inspector.h"
-#include "pointcloud/point_cloud2_time_field_extractor.h"
+#include "domain/sensors/pointcloud/point_cloud2_field_inspector.h"
+#include "domain/sensors/pointcloud/point_cloud2_time_field_extractor.h"
 
 namespace causal_slam::ros_adapters {
 

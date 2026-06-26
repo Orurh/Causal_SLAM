@@ -146,15 +146,15 @@ Shared ROS-free logic lives in:
 
 ~~~text
 src/application/temporal_monitor/
-src/pointcloud/
-src/coverage/
-src/diagnostics/
-src/lidar/
-src/model/
-src/policy/
-src/statistics/
-src/telemetry/
-src/render/
+src/domain/sensors/pointcloud/
+src/domain/sensors/imu/
+src/domain/diagnostics/
+src/domain/sensors/lidar/
+src/domain/model/
+src/domain/policy/
+src/domain/statistics/
+src/domain/telemetry/
+src/presentation/render/
 ~~~
 
 ROS1-specific code lives in:
@@ -166,8 +166,8 @@ ros1/causal_slam_ros1/
 ROS2-specific code lives in:
 
 ~~~text
-src/nodes/
-src/ros_adapters/
+src/apps/ros2/
+src/adapters/ros2/
 ~~~
 
 Dependency direction:

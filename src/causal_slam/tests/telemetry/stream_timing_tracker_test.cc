@@ -1,4 +1,4 @@
-#include "telemetry/stream_timing_tracker.h"
+#include "domain/telemetry/stream_timing_tracker.h"
 
 #include <cstdint>
 

@@ -2,11 +2,12 @@
 
 #include <string>
 
-#include "diagnostics/temporal_diagnostics.h"
+#include "domain/diagnostics/temporal_diagnostics.h"
+#include "domain/policy/map_update_decision.h"
 
 namespace causal_slam::render {
 
-[[nodiscard]] std::string RenderMapUpdateDecisionJson(
-    const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot);
+[[nodiscard]] std::string RenderMapUpdateDecisionJson(const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot,
+                                                      const causal_slam::policy::MapUpdateDecision& map_update_decision);
 
 }  // namespace causal_slam::render

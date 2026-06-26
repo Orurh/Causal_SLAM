@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "policy/map_update_decision.h"
+#include "domain/policy/map_update_decision.h"
 
 namespace causal_slam::render {
 namespace {
@@ -17,15 +17,18 @@ namespace transform = causal_slam::transform;
 diagnostics::TemporalDiagnosticSnapshot MakeSnapshot() {
   diagnostics::TemporalDiagnosticSnapshot snapshot;
   snapshot.overall_status = telemetry::TemporalHealthStatus::kOk;
-  snapshot.map_update_decision =
-      policy::DecideMapUpdate(telemetry::TemporalHealthStatus::kOk);
   return snapshot;
+}
+
+causal_slam::policy::MapUpdateDecision MakeDecision() {
+  return causal_slam::policy::DecideMapUpdate(
+      causal_slam::telemetry::TemporalHealthStatus::kOk);
 }
 
 TEST(ConsoleTemporalSummaryRendererTest, RendersNoTfChecksWhenEmpty) {
   const ConsoleTemporalSummaryRenderer renderer;
 
-  const auto text = renderer.Render(MakeSnapshot());
+  const auto text = renderer.Render(MakeSnapshot(), MakeDecision());
 
   EXPECT_NE(text.find("TF checks:"), std::string::npos);
   EXPECT_NE(text.find("  none"), std::string::npos);
@@ -47,7 +50,7 @@ TEST(ConsoleTemporalSummaryRendererTest, RendersTransformAgeSummary) {
   snapshot.observation.transform_ages.push_back(summary);
 
   const ConsoleTemporalSummaryRenderer renderer;
-  const auto text = renderer.Render(snapshot);
+  const auto text = renderer.Render(snapshot, MakeDecision());
 
   EXPECT_NE(text.find("TF checks:"), std::string::npos);
   EXPECT_NE(text.find("odom <- lidar: INVALID"), std::string::npos);

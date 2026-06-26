@@ -1,6 +1,6 @@
 #include "console_temporal_summary_renderer.h"
 
-#include "policy/map_update_decision.h"
+#include "domain/policy/map_update_decision.h"
 
 #include <sstream>
 #include <string>
@@ -9,8 +9,7 @@
 namespace causal_slam::render {
 namespace {
 
-std::string CoverageStatus(
-    const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot) {
+std::string CoverageStatus(const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot) {
   if (!snapshot.observation.imu_coverage.has_value()) {
     return "not_available";
   }
@@ -44,8 +43,7 @@ void RenderWindowStatistics(std::ostringstream& out, const char* title, const ca
 
   out << "  health:"
       << " OK=" << stats.health.ok_count << " WARNING=" << stats.health.warning_count << " DEGRADED=" << stats.health.degraded_count
-      << " INVALID=" << stats.health.invalid_count
-      << '\n';
+      << " INVALID=" << stats.health.invalid_count << '\n';
 
   out << "  scan_window_sources:"
       << " point_time_field=" << stats.scan_window_sources.point_time_field_count
@@ -71,10 +69,7 @@ void RenderWindowStatistics(std::ostringstream& out, const char* title, const ca
   RenderNumericStats(out, "  ", "imu_max_gap_inside_ms", stats.imu_max_gap_inside_ms);
 }
 
-
-void RenderTransformChecks(
-    std::ostringstream& out,
-    const std::vector<causal_slam::transform::TransformAgeSummary>& transform_ages) {
+void RenderTransformChecks(std::ostringstream& out, const std::vector<causal_slam::transform::TransformAgeSummary>& transform_ages) {
   out << "TF checks:\n";
 
   if (transform_ages.empty()) {
@@ -83,13 +78,9 @@ void RenderTransformChecks(
   }
 
   for (const auto& transform_age : transform_ages) {
-    out << "  " << transform_age.target_frame << " <- "
-        << transform_age.source_frame << ": "
-        << causal_slam::telemetry::ToString(transform_age.health)
-        << " | status="
-        << causal_slam::transform::ToString(transform_age.status)
-        << " | age_ms=" << transform_age.transform_age_ms
-        << " | receive_delay_ms=" << transform_age.receive_delay_ms;
+    out << "  " << transform_age.target_frame << " <- " << transform_age.source_frame << ": "
+        << causal_slam::telemetry::ToString(transform_age.health) << " | status=" << causal_slam::transform::ToString(transform_age.status)
+        << " | age_ms=" << transform_age.transform_age_ms << " | receive_delay_ms=" << transform_age.receive_delay_ms;
 
     if (!transform_age.reason.empty()) {
       out << " | reason=" << transform_age.reason;
@@ -105,19 +96,15 @@ void RenderTransformChecks(
 
 }  // namespace
 
-std::string ConsoleTemporalSummaryRenderer::Render(const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot) const {
+std::string ConsoleTemporalSummaryRenderer::Render(const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot,
+                                                   const causal_slam::policy::MapUpdateDecision& map_update_decision) const {
   std::ostringstream out;
 
-  out << "Temporal Health: "
-      << causal_slam::telemetry::ToString(snapshot.overall_status) << '\n';
+  out << "Temporal Health: " << causal_slam::telemetry::ToString(snapshot.overall_status) << '\n';
 
   out << "Map update:\n"
-      << "  allowed: "
-      << (snapshot.map_update_decision.map_update_allowed ? "true" : "false")
-      << '\n'
-      << "  reason: "
-      << causal_slam::policy::ToString(snapshot.map_update_decision.reason)
-      << '\n';
+      << "  allowed: " << (map_update_decision.map_update_allowed ? "true" : "false") << '\n'
+      << "  reason: " << causal_slam::policy::ToString(map_update_decision.reason) << '\n';
 
   out << "LiDAR scan window:\n";
   if (!snapshot.observation.lidar_scan_window.has_value()) {
@@ -125,10 +112,8 @@ std::string ConsoleTemporalSummaryRenderer::Render(const causal_slam::diagnostic
         << "  reason: no_lidar_scan_received_yet\n";
   } else {
     const auto& scan_window = *snapshot.observation.lidar_scan_window;
-    out << "  source: " << causal_slam::lidar::ToString(scan_window.source)
-        << '\n'
-        << "  confidence: "
-        << causal_slam::lidar::ToString(scan_window.confidence) << '\n'
+    out << "  source: " << causal_slam::lidar::ToString(scan_window.source) << '\n'
+        << "  confidence: " << causal_slam::lidar::ToString(scan_window.confidence) << '\n'
         << "  duration_ms: " << scan_window.duration_ms << '\n'
         << "  reason: " << scan_window.reason << '\n';
   }
@@ -152,23 +137,20 @@ std::string ConsoleTemporalSummaryRenderer::Render(const causal_slam::diagnostic
     for (const auto& stream : snapshot.observation.streams) {
       const auto& summary = stream.timing;
 
-      out << "  " << causal_slam::telemetry::ToString(stream.id) << ": " << causal_slam::telemetry::ToString(summary.health) << " | period_ms=" << summary.last_period_ms
-          << " | jitter_ms=" << summary.last_jitter_ms << " | gaps=" << summary.window_gap_count
-          << " | reordered=" << summary.window_reordered_count << '\n';
+      out << "  " << causal_slam::telemetry::ToString(stream.id) << ": " << causal_slam::telemetry::ToString(summary.health)
+          << " | period_ms=" << summary.last_period_ms << " | jitter_ms=" << summary.last_jitter_ms
+          << " | gaps=" << summary.window_gap_count << " | reordered=" << summary.window_reordered_count << '\n';
     }
   }
 
   RenderTransformChecks(out, snapshot.observation.transform_ages);
 
-  if (snapshot.observation.lidar_point_time.has_value() &&
-      !snapshot.observation.lidar_point_time->inspection_reason.empty()) {
+  if (snapshot.observation.lidar_point_time.has_value() && !snapshot.observation.lidar_point_time->inspection_reason.empty()) {
     const auto& point_time = *snapshot.observation.lidar_point_time;
 
     out << "LiDAR point time:\n"
-        << "  candidate: " << (point_time.has_time_candidate ? "true" : "false")
-        << '\n'
-        << "  supported: "
-        << (point_time.has_supported_time_field ? "true" : "false") << '\n'
+        << "  candidate: " << (point_time.has_time_candidate ? "true" : "false") << '\n'
+        << "  supported: " << (point_time.has_supported_time_field ? "true" : "false") << '\n'
         << "  field: " << point_time.field_name << '\n'
         << "  datatype: " << point_time.field_datatype << '\n'
         << "  reason: " << point_time.inspection_reason << '\n';
@@ -183,9 +165,8 @@ std::string ConsoleTemporalSummaryRenderer::Render(const causal_slam::diagnostic
   out << "Issues:\n";
 
   for (const auto& issue : snapshot.issues) {
-    out << "  [" << causal_slam::diagnostics::ToString(issue.severity) << "] "
-        << issue.title << " | reason="
-        << causal_slam::diagnostics::ToString(issue.reason) << '\n'
+    out << "  [" << causal_slam::diagnostics::ToString(issue.severity) << "] " << issue.title
+        << " | reason=" << causal_slam::diagnostics::ToString(issue.reason) << '\n'
         << "    Why: " << issue.explanation << '\n'
         << "    Evidence: " << issue.evidence << '\n'
         << "    Action: " << issue.suggested_action << '\n';

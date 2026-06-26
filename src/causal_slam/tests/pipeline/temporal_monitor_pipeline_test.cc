@@ -6,7 +6,7 @@
 
 #include <gtest/gtest.h>
 
-#include "pointcloud/point_cloud2_datatype.h"
+#include "domain/sensors/pointcloud/point_cloud2_datatype.h"
 
 namespace causal_slam::pipeline {
 namespace {
@@ -105,7 +105,7 @@ TEST(TemporalMonitorPipelineTest, HealthyImuCoverageAllowsMapUpdate) {
 
   EXPECT_EQ(snapshot.diagnostics.overall_status,
             causal_slam::telemetry::TemporalHealthStatus::kOk);
-  EXPECT_TRUE(snapshot.diagnostics.map_update_decision.map_update_allowed);
+  EXPECT_TRUE(snapshot.map_update_decision.map_update_allowed);
   EXPECT_EQ(snapshot.diagnostics.observation.imu_buffer_size, 7U);
   ASSERT_TRUE(snapshot.diagnostics.observation.imu_coverage.has_value());
   EXPECT_EQ(snapshot.diagnostics.observation.imu_coverage->health,
@@ -124,7 +124,7 @@ TEST(TemporalMonitorPipelineTest, MissingImuCoverageRejectsMapUpdate) {
 
   EXPECT_EQ(snapshot.diagnostics.overall_status,
             causal_slam::telemetry::TemporalHealthStatus::kDegraded);
-  EXPECT_FALSE(snapshot.diagnostics.map_update_decision.map_update_allowed);
+  EXPECT_FALSE(snapshot.map_update_decision.map_update_allowed);
   ASSERT_TRUE(snapshot.diagnostics.observation.imu_coverage.has_value());
   EXPECT_EQ(snapshot.diagnostics.observation.imu_coverage->health,
             causal_slam::coverage::ImuCoverageHealth::kDegraded);

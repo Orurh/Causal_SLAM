@@ -339,9 +339,11 @@ code {
 }  // namespace
 
 std::string HtmlTemporalSummaryRenderer::RenderDiagnostics(
-    const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot) const {
+    const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot,
+    const causal_slam::policy::MapUpdateDecision& map_update_decision) const {
   const causal_slam::report::TemporalReportBuilder builder;
-  return RenderDocumentBody(builder.BuildDiagnosticsReport(snapshot));
+  return RenderDocumentBody(
+      builder.BuildDiagnosticsReport(snapshot, map_update_decision));
 }
 
 std::string HtmlTemporalSummaryRenderer::RenderStatistics(
@@ -352,6 +354,7 @@ std::string HtmlTemporalSummaryRenderer::RenderStatistics(
 
 std::string HtmlTemporalSummaryRenderer::RenderPage(
     const causal_slam::diagnostics::TemporalDiagnosticSnapshot& diagnostics,
+    const causal_slam::policy::MapUpdateDecision& map_update_decision,
     const causal_slam::statistics::TemporalStatisticsSnapshot& statistics) const {
   std::ostringstream out;
 
@@ -367,7 +370,7 @@ std::string HtmlTemporalSummaryRenderer::RenderPage(
       << "<main>\n"
       << "<h1>Causal-SLAM Temporal Report</h1>\n"
       << "<div class=\"grid\">\n"
-      << RenderDiagnostics(diagnostics)
+      << RenderDiagnostics(diagnostics, map_update_decision)
       << RenderStatistics(statistics)
       << "</div>\n"
       << "</main>\n"

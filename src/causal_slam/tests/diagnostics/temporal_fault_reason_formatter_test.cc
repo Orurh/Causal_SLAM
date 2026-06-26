@@ -1,4 +1,4 @@
-#include "diagnostics/temporal_fault_reason_formatter.h"
+#include "domain/diagnostics/temporal_fault_reason_formatter.h"
 
 #include <gtest/gtest.h>
 

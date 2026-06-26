@@ -1,6 +1,6 @@
-#include "diagnostics/temporal_diagnostics.h"
+#include "domain/diagnostics/temporal_diagnostics.h"
 
-#include "policy/map_update_decision.h"
+#include "domain/policy/map_update_decision.h"
 
 #include <algorithm>
 #include <string>
@@ -229,9 +229,6 @@ TEST(TemporalDiagnosticsBuilderTest,
   const auto snapshot = builder.Build(BaseOkInput());
 
   EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kOk);
-  EXPECT_TRUE(snapshot.map_update_decision.map_update_allowed);
-  EXPECT_EQ(snapshot.map_update_decision.reason,
-            policy::MapUpdateDecisionReason::kTemporalHealthOk);
   EXPECT_TRUE(snapshot.issues.empty());
 }
 
@@ -245,9 +242,7 @@ TEST(TemporalDiagnosticsBuilderTest,
   const auto snapshot = builder.Build(input);
 
   EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kWarning);
-  EXPECT_TRUE(snapshot.map_update_decision.map_update_allowed);
-  EXPECT_EQ(snapshot.map_update_decision.reason,
-            policy::MapUpdateDecisionReason::kTemporalHealthWarning);
+
   EXPECT_TRUE(HasIssueWithTitle(
       snapshot, "LiDAR point timestamps were detected but not trusted"));
   EXPECT_TRUE(HasIssueWithReason(
@@ -294,9 +289,7 @@ TEST(TemporalDiagnosticsBuilderTest, DegradedImuCoverageProducesDegraded) {
   const auto snapshot = builder.Build(input);
 
   EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kDegraded);
-  EXPECT_FALSE(snapshot.map_update_decision.map_update_allowed);
-  EXPECT_EQ(snapshot.map_update_decision.reason,
-            policy::MapUpdateDecisionReason::kTemporalHealthDegraded);
+
   EXPECT_TRUE(HasIssueWithTitle(
       snapshot, "IMU does not properly cover the LiDAR scan window"));
   EXPECT_TRUE(HasIssueWithReason(
@@ -313,7 +306,6 @@ TEST(TemporalDiagnosticsBuilderTest, OkTransformDoesNotCreateIssue) {
   const auto snapshot = builder.Build(input);
 
   EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kOk);
-  EXPECT_TRUE(snapshot.map_update_decision.map_update_allowed);
   EXPECT_FALSE(HasIssueWithReason(snapshot, TemporalFaultReason::kTfLookupFailed));
   EXPECT_FALSE(HasIssueWithReason(snapshot, TemporalFaultReason::kTfAgeTooHigh));
 }
@@ -326,9 +318,7 @@ TEST(TemporalDiagnosticsBuilderTest, FailedTransformLookupProducesInvalid) {
   const auto snapshot = builder.Build(input);
 
   EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kInvalid);
-  EXPECT_FALSE(snapshot.map_update_decision.map_update_allowed);
-  EXPECT_EQ(snapshot.map_update_decision.reason,
-            policy::MapUpdateDecisionReason::kTemporalHealthInvalid);
+
   EXPECT_TRUE(HasIssueWithReason(snapshot, TemporalFaultReason::kTfLookupFailed));
 }
 
@@ -340,7 +330,6 @@ TEST(TemporalDiagnosticsBuilderTest, ExtrapolatedTransformProducesDegraded) {
   const auto snapshot = builder.Build(input);
 
   EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kDegraded);
-  EXPECT_FALSE(snapshot.map_update_decision.map_update_allowed);
   EXPECT_TRUE(HasIssueWithReason(
       snapshot, TemporalFaultReason::kTfExtrapolationRequired));
 }
@@ -353,7 +342,6 @@ TEST(TemporalDiagnosticsBuilderTest, StaleTransformProducesDegraded) {
   const auto snapshot = builder.Build(input);
 
   EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kDegraded);
-  EXPECT_FALSE(snapshot.map_update_decision.map_update_allowed);
   EXPECT_TRUE(HasIssueWithReason(snapshot, TemporalFaultReason::kTfAgeTooHigh));
 }
 
@@ -365,7 +353,6 @@ TEST(TemporalDiagnosticsBuilderTest, FutureTransformProducesDegraded) {
   const auto snapshot = builder.Build(input);
 
   EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kDegraded);
-  EXPECT_FALSE(snapshot.map_update_decision.map_update_allowed);
   EXPECT_TRUE(HasIssueWithReason(
       snapshot, TemporalFaultReason::kTfTransformFromFuture));
 }
@@ -383,9 +370,6 @@ TEST(TemporalDiagnosticsBuilderTest, MissingLidarScanProducesInvalid) {
   const auto snapshot = builder.Build(input);
 
   EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kInvalid);
-  EXPECT_FALSE(snapshot.map_update_decision.map_update_allowed);
-  EXPECT_EQ(snapshot.map_update_decision.reason,
-            policy::MapUpdateDecisionReason::kTemporalHealthInvalid);
   EXPECT_TRUE(HasIssueWithReason(
       snapshot, TemporalFaultReason::kNoLidarScanReceivedYet));
 }

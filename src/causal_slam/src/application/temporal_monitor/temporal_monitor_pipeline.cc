@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <utility>
 
 namespace causal_slam::pipeline {
 namespace {
@@ -168,6 +167,8 @@ TemporalMonitorPipelineSnapshot TemporalMonitorPipeline::BuildSnapshot(
 
   return TemporalMonitorPipelineSnapshot{
       .diagnostics = diagnostic_snapshot,
+      .map_update_decision =
+          causal_slam::policy::DecideMapUpdate(diagnostic_snapshot.overall_status),
       .statistics = temporal_statistics_.Snapshot(now_ns),
   };
 }

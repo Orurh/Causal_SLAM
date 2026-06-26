@@ -1,10 +1,10 @@
-#include "policy/lidar_cloud_gate.h"
+#include "domain/policy/lidar_cloud_gate.h"
 
 #include <cstdint>
 
 #include <gtest/gtest.h>
 
-#include "telemetry/temporal_health.h"
+#include "domain/telemetry/temporal_health.h"
 
 namespace causal_slam::policy {
 namespace {

@@ -10,13 +10,13 @@
 #include <std_msgs/String.h>
 
 #include "causal_slam_ros1/point_cloud2_conversions.h"
-#include "coverage/imu_coverage_analyzer.h"
-#include "diagnostics/temporal_fault_reason_formatter.h"
-#include "lidar/lidar_scan_window_estimator.h"
-#include "pipeline/temporal_monitor_pipeline.h"
-#include "policy/map_update_decision.h"
-#include "render/console_temporal_summary_renderer.h"
-#include "telemetry/temporal_health.h"
+#include "domain/sensors/imu/imu_coverage_analyzer.h"
+#include "domain/diagnostics/temporal_fault_reason_formatter.h"
+#include "domain/sensors/lidar/lidar_scan_window_estimator.h"
+#include "application/temporal_monitor/temporal_monitor_pipeline.h"
+#include "domain/policy/map_update_decision.h"
+#include "presentation/render/console_temporal_summary_renderer.h"
+#include "domain/telemetry/temporal_health.h"
 
 namespace {
 
@@ -222,18 +222,23 @@ class TemporalMonitorRos1Node final {
   void OnTimer(const ros::TimerEvent&) {
     const auto snapshot = temporal_pipeline_.BuildSnapshot(NowNanoseconds());
 
-    PublishDiagnosticTopics(snapshot.diagnostics);
+     PublishDiagnosticTopics(snapshot.diagnostics, snapshot.map_update_decision);
 
     const render::ConsoleTemporalSummaryRenderer renderer;
-    ROS_INFO_STREAM("\n" << renderer.Render(snapshot.diagnostics) << '\n'
-                         << renderer.RenderStatistics(snapshot.statistics));
+    ROS_INFO_STREAM("\n"
+                    << renderer.Render(snapshot.diagnostics,
+                                       snapshot.map_update_decision)
+                    << '\n'
+                    << renderer.RenderStatistics(snapshot.statistics));
+
   }
 
-  void PublishDiagnosticTopics(
-      const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot) {
+void PublishDiagnosticTopics(
+    const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot,
+    const causal_slam::policy::MapUpdateDecision& map_update_decision) {
     std_msgs::Bool map_update_allowed_msg;
     map_update_allowed_msg.data =
-        snapshot.map_update_decision.map_update_allowed;
+        map_update_decision.map_update_allowed;
     map_update_allowed_publisher_.publish(map_update_allowed_msg);
 
     std_msgs::String temporal_health_msg;
@@ -242,7 +247,7 @@ class TemporalMonitorRos1Node final {
 
     std_msgs::String map_update_reason_msg;
     map_update_reason_msg.data =
-        causal_slam::policy::ToString(snapshot.map_update_decision.reason);
+        causal_slam::policy::ToString(map_update_decision.reason);
     map_update_reason_publisher_.publish(map_update_reason_msg);
 
     std_msgs::String fault_reasons_msg;

@@ -1,4 +1,4 @@
-#include "platform/atomic_file_writer.h"
+#include "atomic_file_writer.h"
 
 #include <fstream>
 #include <system_error>

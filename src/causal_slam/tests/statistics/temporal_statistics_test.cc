@@ -1,4 +1,4 @@
-#include "statistics/temporal_statistics.h"
+#include "domain/statistics/temporal_statistics.h"
 
 #include <algorithm>
 #include <cstdint>

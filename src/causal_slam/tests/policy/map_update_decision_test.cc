@@ -1,4 +1,4 @@
-#include "policy/map_update_decision.h"
+#include "domain/policy/map_update_decision.h"
 
 #include <gtest/gtest.h>
 

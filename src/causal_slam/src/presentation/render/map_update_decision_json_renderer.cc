@@ -5,8 +5,7 @@
 #include <string>
 #include <string_view>
 
-#include "diagnostics/temporal_fault_reason_formatter.h"
-#include "policy/map_update_decision.h"
+#include "domain/policy/map_update_decision.h"
 
 namespace causal_slam::render {
 namespace {
@@ -47,27 +46,22 @@ void AppendJsonString(std::ostringstream& out, std::string_view value) {
 
 }  // namespace
 
-std::string RenderMapUpdateDecisionJson(
-    const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot) {
+std::string RenderMapUpdateDecisionJson(const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot,
+                                        const causal_slam::policy::MapUpdateDecision& map_update_decision) {
   std::ostringstream out;
 
   out << "{";
-  out << "\"has_lidar_scan\":"
-      << (snapshot.observation.has_lidar_scan ? "true" : "false") << ",";
-  out << "\"scan_stamp_ns\":"
-      << snapshot.observation.latest_lidar_header_stamp_ns << ",";
+  out << "\"has_lidar_scan\":" << (snapshot.observation.has_lidar_scan ? "true" : "false") << ",";
+  out << "\"scan_stamp_ns\":" << snapshot.observation.latest_lidar_header_stamp_ns << ",";
   out << "\"frame_id\":";
   AppendJsonString(out, snapshot.observation.latest_lidar_frame_id);
   out << ",";
-  out << "\"allowed\":"
-      << (snapshot.map_update_decision.map_update_allowed ? "true" : "false")
-      << ",";
+  out << "\"allowed\":" << (map_update_decision.map_update_allowed ? "true" : "false") << ",";
   out << "\"health\":";
   AppendJsonString(out, causal_slam::telemetry::ToString(snapshot.overall_status));
   out << ",";
   out << "\"reason\":";
-  AppendJsonString(
-      out, causal_slam::policy::ToString(snapshot.map_update_decision.reason));
+  AppendJsonString(out, causal_slam::policy::ToString(map_update_decision.reason));
   out << ",";
   out << "\"fault_reasons\":[";
 

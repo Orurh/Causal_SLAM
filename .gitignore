@@ -1,13 +1,9 @@
 build/
 install/
 log/
-
+.cache/
 .vscode/
 .idea/
-
-*.swp
-*.swo
-*~
-.clang-format
-.clang-tidy
+*.pyc
+__pycache__/
 compile_commands.json

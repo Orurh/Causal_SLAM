@@ -14,9 +14,7 @@ enum class LidarStampPolicy : std::uint8_t {
 
 [[nodiscard]] const char* ToString(LidarStampPolicy policy);
 
-[[nodiscard]] causal_slam::core::TimeWindow BuildLidarScanWindow(
-    std::int64_t header_stamp_ns,
-    double scan_duration_ms,
-    LidarStampPolicy stamp_policy);
+[[nodiscard]] causal_slam::core::TimeWindow BuildLidarScanWindow(std::int64_t header_stamp_ns, double scan_duration_ms,
+                                                                 LidarStampPolicy stamp_policy);
 
 }  // namespace causal_slam::lidar

@@ -28,14 +28,10 @@ TEST(MapUpdateDecisionTest, RejectsDegradedAndInvalid) {
 }
 
 TEST(MapUpdateDecisionTest, ReasonStringsAreStable) {
-  EXPECT_STREQ(ToString(MapUpdateDecisionReason::kTemporalHealthOk),
-               "temporal_health_ok");
-  EXPECT_STREQ(ToString(MapUpdateDecisionReason::kTemporalHealthWarning),
-               "temporal_health_warning");
-  EXPECT_STREQ(ToString(MapUpdateDecisionReason::kTemporalHealthDegraded),
-               "temporal_health_degraded");
-  EXPECT_STREQ(ToString(MapUpdateDecisionReason::kTemporalHealthInvalid),
-               "temporal_health_invalid");
+  EXPECT_STREQ(ToString(MapUpdateDecisionReason::kTemporalHealthOk), "temporal_health_ok");
+  EXPECT_STREQ(ToString(MapUpdateDecisionReason::kTemporalHealthWarning), "temporal_health_warning");
+  EXPECT_STREQ(ToString(MapUpdateDecisionReason::kTemporalHealthDegraded), "temporal_health_degraded");
+  EXPECT_STREQ(ToString(MapUpdateDecisionReason::kTemporalHealthInvalid), "temporal_health_invalid");
 }
 
 }  // namespace

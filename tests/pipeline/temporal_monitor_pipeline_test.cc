@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 
 #include "domain/sensors/pointcloud/point_cloud2_datatype.h"
+#include "domain/time/time_window.h"
 
 namespace causal_slam::pipeline {
 namespace {
@@ -18,16 +19,10 @@ std::int64_t Ms(std::int64_t value) {
 }
 
 template <typename T>
-void WriteValue(
-    std::vector<std::uint8_t>* data,
-    std::uint32_t point_step,
-    std::uint32_t point_index,
-    std::uint32_t field_offset,
-    const T& value) {
+void WriteValue(std::vector<std::uint8_t>* data, std::uint32_t point_step, std::uint32_t point_index, std::uint32_t field_offset,
+                const T& value) {
   const std::size_t byte_offset =
-      static_cast<std::size_t>(point_index) *
-          static_cast<std::size_t>(point_step) +
-      static_cast<std::size_t>(field_offset);
+      static_cast<std::size_t>(point_index) * static_cast<std::size_t>(point_step) + static_cast<std::size_t>(field_offset);
 
   std::memcpy(data->data() + byte_offset, &value, sizeof(T));
 }
@@ -42,8 +37,7 @@ TemporalMonitorPipelineConfig MakeConfig() {
   config.lidar_scan_window.fallback_scan_duration_ms = 100.0;
   config.lidar_scan_window.min_measured_scan_duration_ms = 1.0;
   config.lidar_scan_window.max_measured_scan_duration_ms = 500.0;
-  config.lidar_scan_window.stamp_policy =
-      causal_slam::lidar::LidarStampPolicy::kScanEnd;
+  config.lidar_scan_window.stamp_policy = causal_slam::lidar::LidarStampPolicy::kScanEnd;
   config.lidar_scan_window.prefer_measured_header_period = true;
 
   config.imu_coverage.max_missing_prefix_ms = 40.0;
@@ -53,9 +47,21 @@ TemporalMonitorPipelineConfig MakeConfig() {
   return config;
 }
 
-LidarPipelineInput MakeLidarInput(
-    std::int64_t header_stamp_ns,
-    std::int64_t receive_time_ns) {
+causal_slam::lidar::LidarScanWindowEstimate MakePrecomputedScanWindowEstimate(std::int64_t start_ns, std::int64_t duration_ms) {
+  return causal_slam::lidar::LidarScanWindowEstimate{
+      .window =
+          causal_slam::core::TimeWindow{
+              .start_ns = start_ns,
+              .end_ns = start_ns + Ms(duration_ms),
+          },
+      .duration_ms = static_cast<double>(duration_ms),
+      .source = causal_slam::lidar::LidarScanWindowSource::kPointTimeField,
+      .confidence = causal_slam::lidar::LidarScanWindowConfidence::kHigh,
+      .reason = "precomputed_test_scan_window",
+  };
+}
+
+LidarPipelineInput MakeLidarInput(std::int64_t header_stamp_ns, std::int64_t receive_time_ns) {
   constexpr std::uint32_t point_count = 3;
   constexpr std::uint32_t point_step = sizeof(std::uint32_t);
 
@@ -70,22 +76,25 @@ LidarPipelineInput MakeLidarInput(
       .header_stamp_ns = header_stamp_ns,
       .receive_time_ns = receive_time_ns,
       .frame_id = "lidar",
-      .fields = {
-          causal_slam::pointcloud::PointCloud2FieldInfo{
-              .name = "offset_time",
-              .offset = 0,
-              .datatype = causal_slam::pointcloud::kPointCloud2Uint32,
-              .count = 1,
+      .fields =
+          {
+              causal_slam::pointcloud::PointCloud2FieldInfo{
+                  .name = "offset_time",
+                  .offset = 0,
+                  .datatype = causal_slam::pointcloud::kPointCloud2Uint32,
+                  .count = 1,
+              },
           },
-      },
-      .cloud_view = causal_slam::pointcloud::PointCloud2CloudView{
-          .header_stamp_ns = header_stamp_ns,
-          .width = point_count,
-          .height = 1,
-          .point_step = point_step,
-          .data = data.data(),
-          .data_size = data.size(),
-      },
+      .cloud_view =
+          causal_slam::pointcloud::PointCloud2CloudView{
+              .header_stamp_ns = header_stamp_ns,
+              .width = point_count,
+              .height = 1,
+              .point_step = point_step,
+              .data = data.data(),
+              .data_size = data.size(),
+          },
+      .precomputed_scan_window_estimate = std::nullopt,
   };
 }
 
@@ -103,16 +112,47 @@ TEST(TemporalMonitorPipelineTest, HealthyImuCoverageAllowsMapUpdate) {
 
   const auto snapshot = pipeline.BuildSnapshot(Ms(1200));
 
-  EXPECT_EQ(snapshot.diagnostics.overall_status,
-            causal_slam::telemetry::TemporalHealthStatus::kOk);
+  EXPECT_EQ(snapshot.diagnostics.overall_status, causal_slam::telemetry::TemporalHealthStatus::kOk);
   EXPECT_TRUE(snapshot.map_update_decision.map_update_allowed);
   EXPECT_EQ(snapshot.diagnostics.observation.imu_buffer_size, 7U);
   ASSERT_TRUE(snapshot.diagnostics.observation.imu_coverage.has_value());
-  EXPECT_EQ(snapshot.diagnostics.observation.imu_coverage->health,
-            causal_slam::coverage::ImuCoverageHealth::kOk);
+  EXPECT_EQ(snapshot.diagnostics.observation.imu_coverage->health, causal_slam::coverage::ImuCoverageHealth::kOk);
   ASSERT_TRUE(snapshot.diagnostics.observation.lidar_scan_window.has_value());
-  EXPECT_EQ(snapshot.diagnostics.observation.lidar_scan_window->source,
-            causal_slam::lidar::LidarScanWindowSource::kPointTimeField);
+  EXPECT_EQ(snapshot.diagnostics.observation.lidar_scan_window->source, causal_slam::lidar::LidarScanWindowSource::kPointTimeField);
+}
+
+TEST(TemporalMonitorPipelineTest, UsesPrecomputedScanWindowEstimate) {
+  TemporalMonitorPipeline pipeline{MakeConfig()};
+
+  for (std::int64_t t_ms = 1000; t_ms <= 1180; t_ms += 20) {
+    pipeline.ObserveImu(ImuPipelineInput{
+        .header_stamp_ns = Ms(t_ms),
+        .receive_time_ns = Ms(t_ms),
+    });
+  }
+
+  auto lidar_input = MakeLidarInput(Ms(1000), Ms(1100));
+  lidar_input.precomputed_scan_window_estimate = MakePrecomputedScanWindowEstimate(Ms(1000), 156);
+
+  pipeline.ObserveLidar(lidar_input);
+
+  const auto snapshot = pipeline.BuildSnapshot(Ms(1200));
+
+  EXPECT_EQ(snapshot.diagnostics.overall_status, causal_slam::telemetry::TemporalHealthStatus::kOk);
+  EXPECT_TRUE(snapshot.map_update_decision.map_update_allowed);
+
+  ASSERT_TRUE(snapshot.diagnostics.observation.lidar_scan_window.has_value());
+  const auto& scan_window = *snapshot.diagnostics.observation.lidar_scan_window;
+
+  EXPECT_EQ(scan_window.window.start_ns, Ms(1000));
+  EXPECT_EQ(scan_window.window.end_ns, Ms(1156));
+  EXPECT_DOUBLE_EQ(scan_window.duration_ms, 156.0);
+  EXPECT_EQ(scan_window.source, causal_slam::lidar::LidarScanWindowSource::kPointTimeField);
+  EXPECT_EQ(scan_window.confidence, causal_slam::lidar::LidarScanWindowConfidence::kHigh);
+  EXPECT_EQ(scan_window.reason, "precomputed_test_scan_window");
+
+  ASSERT_TRUE(snapshot.diagnostics.observation.imu_coverage.has_value());
+  EXPECT_EQ(snapshot.diagnostics.observation.imu_coverage->health, causal_slam::coverage::ImuCoverageHealth::kOk);
 }
 
 TEST(TemporalMonitorPipelineTest, MissingImuCoverageRejectsMapUpdate) {
@@ -122,12 +162,64 @@ TEST(TemporalMonitorPipelineTest, MissingImuCoverageRejectsMapUpdate) {
 
   const auto snapshot = pipeline.BuildSnapshot(Ms(1200));
 
-  EXPECT_EQ(snapshot.diagnostics.overall_status,
-            causal_slam::telemetry::TemporalHealthStatus::kDegraded);
+  EXPECT_EQ(snapshot.diagnostics.overall_status, causal_slam::telemetry::TemporalHealthStatus::kDegraded);
   EXPECT_FALSE(snapshot.map_update_decision.map_update_allowed);
   ASSERT_TRUE(snapshot.diagnostics.observation.imu_coverage.has_value());
-  EXPECT_EQ(snapshot.diagnostics.observation.imu_coverage->health,
-            causal_slam::coverage::ImuCoverageHealth::kDegraded);
+  EXPECT_EQ(snapshot.diagnostics.observation.imu_coverage->health, causal_slam::coverage::ImuCoverageHealth::kDegraded);
+}
+
+TEST(TemporalMonitorPipelineTest, ExtractsPointTimeWhenPrecomputedScanWindowIsMissing) {
+  TemporalMonitorPipeline pipeline{MakeConfig()};
+
+  for (std::int64_t t_ms = 1000; t_ms <= 1120; t_ms += 20) {
+    pipeline.ObserveImu(ImuPipelineInput{
+        .header_stamp_ns = Ms(t_ms),
+        .receive_time_ns = Ms(t_ms),
+    });
+  }
+
+  auto lidar_input = MakeLidarInput(Ms(1000), Ms(1100));
+  lidar_input.precomputed_scan_window_estimate = std::nullopt;
+
+  pipeline.ObserveLidar(lidar_input);
+
+  const auto snapshot = pipeline.BuildSnapshot(Ms(1200));
+
+  ASSERT_TRUE(snapshot.diagnostics.observation.lidar_scan_window.has_value());
+  const auto& scan_window = *snapshot.diagnostics.observation.lidar_scan_window;
+
+  EXPECT_EQ(scan_window.window.start_ns, Ms(1000));
+  EXPECT_EQ(scan_window.window.end_ns, Ms(1100));
+  EXPECT_DOUBLE_EQ(scan_window.duration_ms, 100.0);
+  EXPECT_EQ(scan_window.source, causal_slam::lidar::LidarScanWindowSource::kPointTimeField);
+
+  ASSERT_TRUE(snapshot.diagnostics.observation.imu_coverage.has_value());
+  EXPECT_EQ(snapshot.diagnostics.observation.imu_coverage->health, causal_slam::coverage::ImuCoverageHealth::kOk);
+}
+
+TEST(TemporalMonitorPipelineTest, PrecomputedScanWindowControlsImuCoverageWindow) {
+  TemporalMonitorPipeline pipeline{MakeConfig()};
+
+  for (std::int64_t t_ms = 1000; t_ms <= 1200; t_ms += 20) {
+    pipeline.ObserveImu(ImuPipelineInput{
+        .header_stamp_ns = Ms(t_ms),
+        .receive_time_ns = Ms(t_ms),
+    });
+  }
+
+  auto lidar_input = MakeLidarInput(Ms(1000), Ms(1100));
+  lidar_input.precomputed_scan_window_estimate = MakePrecomputedScanWindowEstimate(Ms(1000), 200);
+
+  pipeline.ObserveLidar(lidar_input);
+
+  const auto snapshot = pipeline.BuildSnapshot(Ms(1250));
+
+  ASSERT_TRUE(snapshot.diagnostics.observation.lidar_scan_window.has_value());
+  EXPECT_EQ(snapshot.diagnostics.observation.lidar_scan_window->window.end_ns, Ms(1200));
+  EXPECT_DOUBLE_EQ(snapshot.diagnostics.observation.lidar_scan_window->duration_ms, 200.0);
+
+  ASSERT_TRUE(snapshot.diagnostics.observation.imu_coverage.has_value());
+  EXPECT_EQ(snapshot.diagnostics.observation.imu_coverage->health, causal_slam::coverage::ImuCoverageHealth::kOk);
 }
 
 TEST(TemporalMonitorPipelineTest, TransformObservationIsStoredInSnapshot) {
@@ -147,14 +239,10 @@ TEST(TemporalMonitorPipelineTest, TransformObservationIsStoredInSnapshot) {
   const auto snapshot = pipeline.BuildSnapshot(Ms(1200));
 
   ASSERT_FALSE(snapshot.diagnostics.observation.transform_ages.empty());
-  EXPECT_EQ(snapshot.diagnostics.observation.transform_ages.front().status,
-            causal_slam::transform::TransformLookupStatus::kOk);
-  EXPECT_EQ(snapshot.diagnostics.observation.transform_ages.front().target_frame,
-            "odom");
-  EXPECT_EQ(snapshot.diagnostics.observation.transform_ages.front().source_frame,
-            "base_link");
-  EXPECT_DOUBLE_EQ(
-      snapshot.diagnostics.observation.transform_ages.front().transform_age_ms, 10.0);
+  EXPECT_EQ(snapshot.diagnostics.observation.transform_ages.front().status, causal_slam::transform::TransformLookupStatus::kOk);
+  EXPECT_EQ(snapshot.diagnostics.observation.transform_ages.front().target_frame, "odom");
+  EXPECT_EQ(snapshot.diagnostics.observation.transform_ages.front().source_frame, "base_link");
+  EXPECT_DOUBLE_EQ(snapshot.diagnostics.observation.transform_ages.front().transform_age_ms, 10.0);
 }
 
 }  // namespace

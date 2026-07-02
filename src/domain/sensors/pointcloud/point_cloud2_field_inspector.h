@@ -15,6 +15,31 @@ enum class PointCloud2TimeFieldRole : std::uint8_t {
   kSplitTimeNanosecond,
 };
 
+enum class PointCloud2TimeFieldOverrideMode : std::uint8_t {
+  kAuto,
+  kExplicit,
+  kDisabled,
+};
+
+enum class PointCloud2TimeFieldOverrideInterpretation : std::uint8_t {
+  kAuto,
+  kAbsolute,
+  kRelative,
+};
+
+enum class PointCloud2TimeFieldOverrideUnit : std::uint8_t {
+  kAuto,
+  kSeconds,
+  kNanoseconds,
+};
+
+struct PointCloud2TimeFieldOverrideConfig {
+  PointCloud2TimeFieldOverrideMode mode{PointCloud2TimeFieldOverrideMode::kAuto};
+  std::string field_name;
+  PointCloud2TimeFieldOverrideInterpretation interpretation{PointCloud2TimeFieldOverrideInterpretation::kAuto};
+  PointCloud2TimeFieldOverrideUnit unit{PointCloud2TimeFieldOverrideUnit::kAuto};
+};
+
 [[nodiscard]] const char* ToString(PointCloud2TimeFieldRole role);
 [[nodiscard]] const char* PointCloud2DatatypeToString(std::uint8_t datatype);
 
@@ -41,7 +66,8 @@ struct PointCloud2FieldInspection {
 class PointCloud2FieldInspector final {
  public:
   [[nodiscard]] PointCloud2FieldInspection Inspect(
-      const std::vector<PointCloud2FieldInfo>& fields) const;
+      const std::vector<PointCloud2FieldInfo>& fields,
+      const PointCloud2TimeFieldOverrideConfig& config = PointCloud2TimeFieldOverrideConfig{}) const;
 };
 
 }  // namespace causal_slam::pointcloud

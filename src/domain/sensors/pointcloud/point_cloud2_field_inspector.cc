@@ -12,16 +12,13 @@ namespace causal_slam::pointcloud {
 namespace {
 
 std::string ToLower(std::string value) {
-  std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
-    return static_cast<char>(std::tolower(ch));
-  });
+  std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
 
   return value;
 }
 
 bool IsAbsoluteFloat32Timestamp(const PointCloud2FieldInfo& field_info) {
-  return field_info.time_role == PointCloud2TimeFieldRole::kPointTime &&
-         field_info.datatype == kPointCloud2Float32;
+  return field_info.time_role == PointCloud2TimeFieldRole::kPointTime && field_info.datatype == kPointCloud2Float32;
 }
 
 bool IsSupportedTimeField(const PointCloud2FieldInfo& field_info) {
@@ -45,18 +42,17 @@ bool IsSupportedTimeField(const PointCloud2FieldInfo& field_info) {
 }
 
 bool IsSimpleTimeRole(PointCloud2TimeFieldRole role) {
-  return role == PointCloud2TimeFieldRole::kPointTime ||
-         role == PointCloud2TimeFieldRole::kPointOffsetTime;
+  return role == PointCloud2TimeFieldRole::kPointTime || role == PointCloud2TimeFieldRole::kPointOffsetTime;
 }
 
 PointCloud2TimeFieldRole DetectTimeFieldRole(const std::string& field_name) {
   const std::string name = ToLower(field_name);
 
-  if (name == "timestamp" || name == "time" || name == "t") {
+  if (name == "timestamp" || name == "time") {
     return PointCloud2TimeFieldRole::kPointTime;
   }
 
-  if (name == "offset_time" || name == "time_offset" || name == "offsettime") {
+  if (name == "t" || name == "offset_time" || name == "time_offset" || name == "offsettime") {
     return PointCloud2TimeFieldRole::kPointOffsetTime;
   }
 
@@ -64,9 +60,45 @@ PointCloud2TimeFieldRole DetectTimeFieldRole(const std::string& field_name) {
     return PointCloud2TimeFieldRole::kSplitTimeSecond;
   }
 
-  if (name == "timenanosecond" || name == "time_nanosecond" ||
-      name == "time_ns") {
+  if (name == "timenanosecond" || name == "time_nanosecond" || name == "time_ns") {
     return PointCloud2TimeFieldRole::kSplitTimeNanosecond;
+  }
+
+  return PointCloud2TimeFieldRole::kNone;
+}
+
+PointCloud2TimeFieldRole ResolveTimeFieldRole(const PointCloud2FieldInfo& field_info, const PointCloud2TimeFieldOverrideConfig& config) {
+  if (config.mode == PointCloud2TimeFieldOverrideMode::kDisabled) {
+    return PointCloud2TimeFieldRole::kNone;
+  }
+
+  if (config.mode == PointCloud2TimeFieldOverrideMode::kAuto) {
+    return DetectTimeFieldRole(field_info.name);
+  }
+
+  if (ToLower(field_info.name) != ToLower(config.field_name)) {
+    return PointCloud2TimeFieldRole::kNone;
+  }
+
+  if (config.interpretation == PointCloud2TimeFieldOverrideInterpretation::kAbsolute) {
+    return PointCloud2TimeFieldRole::kPointTime;
+  }
+
+  if (config.interpretation == PointCloud2TimeFieldOverrideInterpretation::kRelative) {
+    return PointCloud2TimeFieldRole::kPointOffsetTime;
+  }
+
+  const auto auto_role = DetectTimeFieldRole(field_info.name);
+  if (auto_role != PointCloud2TimeFieldRole::kNone) {
+    return auto_role;
+  }
+
+  if (config.unit == PointCloud2TimeFieldOverrideUnit::kNanoseconds) {
+    return PointCloud2TimeFieldRole::kPointOffsetTime;
+  }
+
+  if (config.unit == PointCloud2TimeFieldOverrideUnit::kSeconds) {
+    return PointCloud2TimeFieldRole::kPointTime;
   }
 
   return PointCloud2TimeFieldRole::kNone;
@@ -114,8 +146,8 @@ const char* PointCloud2DatatypeToString(std::uint8_t datatype) {
   }
 }
 
-PointCloud2FieldInspection PointCloud2FieldInspector::Inspect(
-    const std::vector<PointCloud2FieldInfo>& fields) const {
+PointCloud2FieldInspection PointCloud2FieldInspector::Inspect(const std::vector<PointCloud2FieldInfo>& fields,
+                                                              const PointCloud2TimeFieldOverrideConfig& config) const {
   PointCloud2FieldInspection inspection;
   inspection.fields.reserve(fields.size());
 
@@ -125,7 +157,7 @@ PointCloud2FieldInspection PointCloud2FieldInspector::Inspect(
   bool has_unsupported_simple_time_field = false;
 
   for (auto field_info : fields) {
-    field_info.time_role = DetectTimeFieldRole(field_info.name);
+    field_info.time_role = ResolveTimeFieldRole(field_info, config);
 
     if (field_info.time_role != PointCloud2TimeFieldRole::kNone) {
       inspection.has_time_candidate = true;
@@ -139,8 +171,7 @@ PointCloud2FieldInspection PointCloud2FieldInspector::Inspect(
       has_split_time_nanosecond = true;
     }
 
-    if (!inspection.primary_time_field.has_value() &&
-        IsSimpleTimeRole(field_info.time_role)) {
+    if (!inspection.primary_time_field.has_value() && IsSimpleTimeRole(field_info.time_role)) {
       if (IsAbsoluteFloat32Timestamp(field_info)) {
         has_unsafe_absolute_float32_timestamp = true;
       } else if (IsSupportedTimeField(field_info)) {
@@ -171,6 +202,18 @@ PointCloud2FieldInspection PointCloud2FieldInspector::Inspect(
 
   if (has_unsupported_simple_time_field) {
     inspection.reason = "unsupported_time_field_datatype";
+    return inspection;
+  }
+
+  if (config.mode == PointCloud2TimeFieldOverrideMode::kDisabled) {
+    inspection.reason = "point_time_detection_disabled";
+    return inspection;
+  }
+
+  if (config.mode == PointCloud2TimeFieldOverrideMode::kExplicit && !inspection.primary_time_field.has_value() &&
+      !config.field_name.empty()) {
+    inspection.has_time_candidate = true;
+    inspection.reason = "configured_point_time_field_not_found_or_unsupported";
     return inspection;
   }
 

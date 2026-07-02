@@ -11,13 +11,11 @@
 
 namespace causal_slam::ros_adapters {
 
-[[nodiscard]] std::int64_t HeaderStampToNanoseconds(
-    const builtin_interfaces::msg::Time& stamp);
+[[nodiscard]] std::int64_t HeaderStampToNanoseconds(const builtin_interfaces::msg::Time& stamp);
 
-[[nodiscard]] std::vector<causal_slam::pointcloud::PointCloud2FieldInfo>
-ToPointCloud2FieldInfos(const sensor_msgs::msg::PointCloud2& cloud);
+[[nodiscard]] std::vector<causal_slam::pointcloud::PointCloud2FieldInfo> ToPointCloud2FieldInfos(
+    const sensor_msgs::msg::PointCloud2& cloud);
 
-[[nodiscard]] causal_slam::pointcloud::PointCloud2CloudView
-ToPointCloud2CloudView(const sensor_msgs::msg::PointCloud2& cloud);
+[[nodiscard]] causal_slam::pointcloud::PointCloud2CloudView ToPointCloud2CloudView(const sensor_msgs::msg::PointCloud2& cloud);
 
 }  // namespace causal_slam::ros_adapters

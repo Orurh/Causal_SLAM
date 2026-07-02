@@ -28,6 +28,7 @@ struct TemporalMonitorPipelineConfig {
   std::int64_t imu_buffer_retention_ns{5'000'000'000LL};
 
   causal_slam::lidar::LidarScanWindowEstimatorConfig lidar_scan_window;
+  causal_slam::pointcloud::PointCloud2TimeFieldOverrideConfig point_time;
   causal_slam::coverage::ImuCoverageConfig imu_coverage;
   causal_slam::statistics::TemporalStatisticsAggregatorConfig statistics;
   causal_slam::transform::TransformAgeAnalyzerConfig transform_age;
@@ -45,6 +46,7 @@ struct LidarPipelineInput {
 
   std::vector<causal_slam::pointcloud::PointCloud2FieldInfo> fields;
   causal_slam::pointcloud::PointCloud2CloudView cloud_view;
+  std::optional<causal_slam::lidar::LidarScanWindowEstimate> precomputed_scan_window_estimate;
 };
 
 struct TemporalMonitorPipelineSnapshot {
@@ -71,12 +73,6 @@ class TemporalMonitorPipeline final {
   [[nodiscard]] std::size_t ImuBufferSize() const;
 
  private:
-  [[nodiscard]] causal_slam::model::PointTimeDiagnostics BuildPointTimeDiagnostics(
-      const causal_slam::pointcloud::PointCloud2FieldInspection& inspection) const;
-
-  [[nodiscard]] causal_slam::lidar::LidarScanWindowEstimate BuildPointTimeFieldEstimate(
-      const causal_slam::pointcloud::PointCloud2TimeFieldExtraction& extraction) const;
-
   TemporalMonitorPipelineConfig config_;
 
   causal_slam::telemetry::StreamTimingTracker imu_timing_tracker_;

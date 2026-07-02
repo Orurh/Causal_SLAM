@@ -17,8 +17,7 @@ struct TransformLookupRequest {
   std::int64_t receive_time_ns{0};
 };
 
-[[nodiscard]] causal_slam::transform::TransformLookupObservation LookupTransform(
-    tf2_ros::Buffer& tf_buffer,
-    const TransformLookupRequest& request);
+[[nodiscard]] causal_slam::transform::TransformLookupObservation LookupTransform(tf2_ros::Buffer& tf_buffer,
+                                                                                 const TransformLookupRequest& request);
 
 }  // namespace causal_slam::ros_adapters

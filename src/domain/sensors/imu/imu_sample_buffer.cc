@@ -5,8 +5,7 @@
 
 namespace causal_slam::coverage {
 
-ImuSampleBuffer::ImuSampleBuffer(std::int64_t retention_ns)
-    : retention_ns_(std::max<std::int64_t>(retention_ns, 0)) {}
+ImuSampleBuffer::ImuSampleBuffer(std::int64_t retention_ns) : retention_ns_(std::max<std::int64_t>(retention_ns, 0)) {}
 
 void ImuSampleBuffer::Add(ImuSample sample) {
   if (!samples_.empty() && sample.stamp_ns < samples_.back().stamp_ns) {

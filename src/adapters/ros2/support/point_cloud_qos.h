@@ -10,20 +10,12 @@
 namespace causal_slam::ros_support {
 
 inline std::string NormalizeQosReliability(std::string value) {
-  std::transform(
-      value.begin(),
-      value.end(),
-      value.begin(),
-      [](unsigned char ch) {
-        return static_cast<char>(std::tolower(ch));
-      });
+  std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
 
   return value;
 }
 
-inline rclcpp::QoS MakePointCloudQos(
-    const std::string& reliability,
-    int depth) {
+inline rclcpp::QoS MakePointCloudQos(const std::string& reliability, int depth) {
   const int safe_depth = std::max(depth, 1);
   const std::string normalized = NormalizeQosReliability(reliability);
 

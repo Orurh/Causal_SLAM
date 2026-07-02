@@ -23,8 +23,7 @@ template <typename T, typename = void>
 struct HasOverallStatus : std::false_type {};
 
 template <typename T>
-struct HasOverallStatus<T, std::void_t<decltype(std::declval<T>().overall_status)>>
-    : std::true_type {};
+struct HasOverallStatus<T, std::void_t<decltype(std::declval<T>().overall_status)>> : std::true_type {};
 
 static_assert(!HasOverallStatus<model::TemporalObservation>::value);
 static_assert(HasOverallStatus<TemporalDiagnosticSnapshot>::value);
@@ -170,8 +169,7 @@ model::PointTimeDiagnostics RejectedFloat32Timestamp() {
   diagnostics.field_name = "timestamp";
   diagnostics.field_datatype = "FLOAT32";
   diagnostics.field_role = "point_time";
-  diagnostics.inspection_reason =
-      "absolute_float32_timestamp_precision_unsafe";
+  diagnostics.inspection_reason = "absolute_float32_timestamp_precision_unsafe";
   return diagnostics;
 }
 
@@ -188,42 +186,26 @@ model::TemporalObservation BaseOkInput() {
   return input;
 }
 
-bool HasIssueWithTitle(const TemporalDiagnosticSnapshot& snapshot,
-                       const std::string& title) {
-  return std::any_of(snapshot.issues.begin(), snapshot.issues.end(),
-                     [&](const auto& issue) {
-                       return issue.title == title;
-                     });
+bool HasIssueWithTitle(const TemporalDiagnosticSnapshot& snapshot, const std::string& title) {
+  return std::any_of(snapshot.issues.begin(), snapshot.issues.end(), [&](const auto& issue) { return issue.title == title; });
 }
 
-bool HasIssueWithReason(const TemporalDiagnosticSnapshot& snapshot,
-                        TemporalFaultReason reason) {
-  return std::any_of(snapshot.issues.begin(), snapshot.issues.end(),
-                     [reason](const auto& issue) {
-                       return issue.reason == reason;
-                     });
+bool HasIssueWithReason(const TemporalDiagnosticSnapshot& snapshot, TemporalFaultReason reason) {
+  return std::any_of(snapshot.issues.begin(), snapshot.issues.end(), [reason](const auto& issue) { return issue.reason == reason; });
 }
 
 TEST(TemporalDiagnosticsBuilderTest, FaultReasonToStringIsStable) {
   EXPECT_STREQ(ToString(TemporalFaultReason::kNone), "none");
-  EXPECT_STREQ(ToString(TemporalFaultReason::kStreamTimingUnstable),
-               "stream_timing_unstable");
-  EXPECT_STREQ(ToString(TemporalFaultReason::kImuWindowIncomplete),
-               "imu_window_incomplete");
-  EXPECT_STREQ(ToString(TemporalFaultReason::kLidarPointTimeUnsupported),
-               "lidar_point_time_unsupported");
-  EXPECT_STREQ(ToString(TemporalFaultReason::kTfLookupFailed),
-               "tf_lookup_failed");
-  EXPECT_STREQ(ToString(TemporalFaultReason::kTfExtrapolationRequired),
-               "tf_extrapolation_required");
-  EXPECT_STREQ(ToString(TemporalFaultReason::kTfAgeTooHigh),
-               "tf_age_too_high");
-  EXPECT_STREQ(ToString(TemporalFaultReason::kTfTransformFromFuture),
-               "tf_transform_from_future");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kStreamTimingUnstable), "stream_timing_unstable");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kImuWindowIncomplete), "imu_window_incomplete");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kLidarPointTimeUnsupported), "lidar_point_time_unsupported");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kTfLookupFailed), "tf_lookup_failed");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kTfExtrapolationRequired), "tf_extrapolation_required");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kTfAgeTooHigh), "tf_age_too_high");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kTfTransformFromFuture), "tf_transform_from_future");
 }
 
-TEST(TemporalDiagnosticsBuilderTest,
-     SupportedPointTimeAndOkCoverageProducesOkSnapshot) {
+TEST(TemporalDiagnosticsBuilderTest, SupportedPointTimeAndOkCoverageProducesOkSnapshot) {
   const TemporalDiagnosticsBuilder builder;
 
   const auto snapshot = builder.Build(BaseOkInput());
@@ -232,8 +214,7 @@ TEST(TemporalDiagnosticsBuilderTest,
   EXPECT_TRUE(snapshot.issues.empty());
 }
 
-TEST(TemporalDiagnosticsBuilderTest,
-     RejectedFloat32TimestampProducesWarning) {
+TEST(TemporalDiagnosticsBuilderTest, RejectedFloat32TimestampProducesWarning) {
   auto input = BaseOkInput();
   input.lidar_scan_window = MediumConfidenceMeasuredWindow();
   input.lidar_point_time = RejectedFloat32Timestamp();
@@ -243,14 +224,11 @@ TEST(TemporalDiagnosticsBuilderTest,
 
   EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kWarning);
 
-  EXPECT_TRUE(HasIssueWithTitle(
-      snapshot, "LiDAR point timestamps were detected but not trusted"));
-  EXPECT_TRUE(HasIssueWithReason(
-      snapshot, TemporalFaultReason::kLidarPointTimeUnsupported));
+  EXPECT_TRUE(HasIssueWithTitle(snapshot, "LiDAR point timestamps were detected but not trusted"));
+  EXPECT_TRUE(HasIssueWithReason(snapshot, TemporalFaultReason::kLidarPointTimeUnsupported));
 }
 
-TEST(TemporalDiagnosticsBuilderTest,
-     MeasuredHeaderPeriodWithoutPointTimeCandidateIsOk) {
+TEST(TemporalDiagnosticsBuilderTest, MeasuredHeaderPeriodWithoutPointTimeCandidateIsOk) {
   auto input = BaseOkInput();
   input.lidar_scan_window = MediumConfidenceMeasuredWindow();
 
@@ -275,10 +253,8 @@ TEST(TemporalDiagnosticsBuilderTest, LowConfidenceScanWindowProducesWarning) {
   const auto snapshot = builder.Build(input);
 
   EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kWarning);
-  EXPECT_TRUE(HasIssueWithTitle(
-      snapshot, "LiDAR scan window has low confidence"));
-  EXPECT_TRUE(HasIssueWithReason(
-      snapshot, TemporalFaultReason::kLidarScanWindowLowConfidence));
+  EXPECT_TRUE(HasIssueWithTitle(snapshot, "LiDAR scan window has low confidence"));
+  EXPECT_TRUE(HasIssueWithReason(snapshot, TemporalFaultReason::kLidarScanWindowLowConfidence));
 }
 
 TEST(TemporalDiagnosticsBuilderTest, DegradedImuCoverageProducesDegraded) {
@@ -290,10 +266,8 @@ TEST(TemporalDiagnosticsBuilderTest, DegradedImuCoverageProducesDegraded) {
 
   EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kDegraded);
 
-  EXPECT_TRUE(HasIssueWithTitle(
-      snapshot, "IMU does not properly cover the LiDAR scan window"));
-  EXPECT_TRUE(HasIssueWithReason(
-      snapshot, TemporalFaultReason::kImuWindowIncomplete));
+  EXPECT_TRUE(HasIssueWithTitle(snapshot, "IMU does not properly cover the LiDAR scan window"));
+  EXPECT_TRUE(HasIssueWithReason(snapshot, TemporalFaultReason::kImuWindowIncomplete));
 }
 
 }  // namespace
@@ -330,8 +304,7 @@ TEST(TemporalDiagnosticsBuilderTest, ExtrapolatedTransformProducesDegraded) {
   const auto snapshot = builder.Build(input);
 
   EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kDegraded);
-  EXPECT_TRUE(HasIssueWithReason(
-      snapshot, TemporalFaultReason::kTfExtrapolationRequired));
+  EXPECT_TRUE(HasIssueWithReason(snapshot, TemporalFaultReason::kTfExtrapolationRequired));
 }
 
 TEST(TemporalDiagnosticsBuilderTest, StaleTransformProducesDegraded) {
@@ -353,10 +326,8 @@ TEST(TemporalDiagnosticsBuilderTest, FutureTransformProducesDegraded) {
   const auto snapshot = builder.Build(input);
 
   EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kDegraded);
-  EXPECT_TRUE(HasIssueWithReason(
-      snapshot, TemporalFaultReason::kTfTransformFromFuture));
+  EXPECT_TRUE(HasIssueWithReason(snapshot, TemporalFaultReason::kTfTransformFromFuture));
 }
-
 
 TEST(TemporalDiagnosticsBuilderTest, MissingLidarScanProducesInvalid) {
   model::TemporalObservation input;
@@ -370,7 +341,6 @@ TEST(TemporalDiagnosticsBuilderTest, MissingLidarScanProducesInvalid) {
   const auto snapshot = builder.Build(input);
 
   EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kInvalid);
-  EXPECT_TRUE(HasIssueWithReason(
-      snapshot, TemporalFaultReason::kNoLidarScanReceivedYet));
+  EXPECT_TRUE(HasIssueWithReason(snapshot, TemporalFaultReason::kNoLidarScanReceivedYet));
 }
 }  // namespace causal_slam::diagnostics

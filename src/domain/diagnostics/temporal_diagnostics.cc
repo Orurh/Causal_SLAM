@@ -6,31 +6,26 @@
 namespace causal_slam::diagnostics {
 namespace {
 
-causal_slam::telemetry::TemporalHealthStatus MaxStatus(
-    causal_slam::telemetry::TemporalHealthStatus lhs,
-    causal_slam::telemetry::TemporalHealthStatus rhs) {
+causal_slam::telemetry::TemporalHealthStatus MaxStatus(causal_slam::telemetry::TemporalHealthStatus lhs,
+                                                       causal_slam::telemetry::TemporalHealthStatus rhs) {
   using causal_slam::telemetry::TemporalHealthStatus;
 
-  if (lhs == TemporalHealthStatus::kInvalid ||
-      rhs == TemporalHealthStatus::kInvalid) {
+  if (lhs == TemporalHealthStatus::kInvalid || rhs == TemporalHealthStatus::kInvalid) {
     return TemporalHealthStatus::kInvalid;
   }
 
-  if (lhs == TemporalHealthStatus::kDegraded ||
-      rhs == TemporalHealthStatus::kDegraded) {
+  if (lhs == TemporalHealthStatus::kDegraded || rhs == TemporalHealthStatus::kDegraded) {
     return TemporalHealthStatus::kDegraded;
   }
 
-  if (lhs == TemporalHealthStatus::kWarning ||
-      rhs == TemporalHealthStatus::kWarning) {
+  if (lhs == TemporalHealthStatus::kWarning || rhs == TemporalHealthStatus::kWarning) {
     return TemporalHealthStatus::kWarning;
   }
 
   return TemporalHealthStatus::kOk;
 }
 
-causal_slam::telemetry::TemporalHealthStatus StatusFromSeverity(
-    TemporalDiagnosticSeverity severity) {
+causal_slam::telemetry::TemporalHealthStatus StatusFromSeverity(TemporalDiagnosticSeverity severity) {
   using causal_slam::telemetry::TemporalHealthStatus;
 
   switch (severity) {
@@ -47,8 +42,7 @@ causal_slam::telemetry::TemporalHealthStatus StatusFromSeverity(
   return TemporalHealthStatus::kInvalid;
 }
 
-TemporalDiagnosticSeverity SeverityFromTemporalHealth(
-    causal_slam::telemetry::TemporalHealthStatus health) {
+TemporalDiagnosticSeverity SeverityFromTemporalHealth(causal_slam::telemetry::TemporalHealthStatus health) {
   switch (health) {
     case causal_slam::telemetry::TemporalHealthStatus::kOk:
       return TemporalDiagnosticSeverity::kInfo;
@@ -63,8 +57,7 @@ TemporalDiagnosticSeverity SeverityFromTemporalHealth(
   return TemporalDiagnosticSeverity::kInvalid;
 }
 
-TemporalDiagnosticSeverity SeverityFromTimingHealth(
-    causal_slam::telemetry::TimingHealth health) {
+TemporalDiagnosticSeverity SeverityFromTimingHealth(causal_slam::telemetry::TimingHealth health) {
   switch (health) {
     case causal_slam::telemetry::TimingHealth::kOk:
       return TemporalDiagnosticSeverity::kInfo;
@@ -77,38 +70,28 @@ TemporalDiagnosticSeverity SeverityFromTimingHealth(
   return TemporalDiagnosticSeverity::kDegraded;
 }
 
-void AddTimingIssue(
-    const char* stream_name,
-    const causal_slam::telemetry::TimingSummary& summary,
-    std::vector<TemporalDiagnosticIssue>* issues) {
+void AddTimingIssue(const std::string& stream_id, const std::string& stream_name, TemporalFaultReason reason,
+                    const causal_slam::telemetry::TimingSummary& summary, std::vector<TemporalDiagnosticIssue>* issues) {
   if (summary.health == causal_slam::telemetry::TimingHealth::kOk) {
     return;
   }
 
   issues->push_back(TemporalDiagnosticIssue{
       .severity = SeverityFromTimingHealth(summary.health),
-      .reason = TemporalFaultReason::kStreamTimingUnstable,
-      .title = std::string(stream_name) + " timing is not stable",
-      .explanation =
-          "The message stream has temporal instability in the latest summary "
-          "window.",
-      .evidence =
-          "reason=" + summary.reason +
-          ", window_count=" + std::to_string(summary.window_count) +
-          ", last_period_ms=" + std::to_string(summary.last_period_ms) +
-          ", window_max_jitter_ms=" +
-          std::to_string(summary.window_max_jitter_ms) +
-          ", window_gap_count=" + std::to_string(summary.window_gap_count) +
-          ", window_reordered_count=" +
-          std::to_string(summary.window_reordered_count),
-      .suggested_action =
-          "Check sensor driver timing, QoS, CPU load, transport latency, and "
-          "timestamp source.",
+      .reason = reason,
+      .title = stream_name + " stream timing is not stable",
+      .explanation = "The message stream has temporal instability in the latest summary "
+                     "window.",
+      .evidence = "stream=" + stream_id + ", reason=" + summary.reason + ", window_count=" + std::to_string(summary.window_count) +
+                  ", last_period_ms=" + std::to_string(summary.last_period_ms) + ", window_max_jitter_ms=" +
+                  std::to_string(summary.window_max_jitter_ms) + ", window_gap_count=" + std::to_string(summary.window_gap_count) +
+                  ", window_reordered_count=" + std::to_string(summary.window_reordered_count),
+      .suggested_action = "Check sensor driver timing, QoS, CPU load, transport latency, and "
+                          "timestamp source.",
   });
 }
 
-TemporalFaultReason FaultReasonFromTransformStatus(
-    causal_slam::transform::TransformLookupStatus status) {
+TemporalFaultReason FaultReasonFromTransformStatus(causal_slam::transform::TransformLookupStatus status) {
   switch (status) {
     case causal_slam::transform::TransformLookupStatus::kOk:
       return TemporalFaultReason::kNone;
@@ -125,8 +108,7 @@ TemporalFaultReason FaultReasonFromTransformStatus(
   return TemporalFaultReason::kNone;
 }
 
-std::string TitleFromTransformStatus(
-    causal_slam::transform::TransformLookupStatus status) {
+std::string TitleFromTransformStatus(causal_slam::transform::TransformLookupStatus status) {
   switch (status) {
     case causal_slam::transform::TransformLookupStatus::kOk:
       return "TF transform is temporally valid";
@@ -143,8 +125,7 @@ std::string TitleFromTransformStatus(
   return "TF transform is not temporally valid";
 }
 
-std::string SuggestedActionFromTransformStatus(
-    causal_slam::transform::TransformLookupStatus status) {
+std::string SuggestedActionFromTransformStatus(causal_slam::transform::TransformLookupStatus status) {
   switch (status) {
     case causal_slam::transform::TransformLookupStatus::kOk:
       return "No action required.";
@@ -166,16 +147,12 @@ std::string SuggestedActionFromTransformStatus(
   return "Check TF timing and frame configuration.";
 }
 
-void AddIssueAndUpdateStatus(TemporalDiagnosticIssue issue,
-                             TemporalDiagnosticSnapshot* snapshot) {
-  snapshot->overall_status = MaxStatus(
-      snapshot->overall_status, StatusFromSeverity(issue.severity));
+void AddIssueAndUpdateStatus(TemporalDiagnosticIssue issue, TemporalDiagnosticSnapshot* snapshot) {
+  snapshot->overall_status = MaxStatus(snapshot->overall_status, StatusFromSeverity(issue.severity));
   snapshot->issues.push_back(std::move(issue));
 }
 
-void AddTransformIssue(
-    const causal_slam::transform::TransformAgeSummary& summary,
-    TemporalDiagnosticSnapshot* snapshot) {
+void AddTransformIssue(const causal_slam::transform::TransformAgeSummary& summary, TemporalDiagnosticSnapshot* snapshot) {
   if (summary.status == causal_slam::transform::TransformLookupStatus::kOk) {
     return;
   }
@@ -190,26 +167,62 @@ void AddTransformIssue(
           .severity = SeverityFromTemporalHealth(summary.health),
           .reason = reason,
           .title = TitleFromTransformStatus(summary.status),
-          .explanation =
-              "The transform lookup result is not temporally safe for the "
-              "sensor measurement timestamp.",
-          .evidence =
-              "target_frame=" + summary.target_frame +
-              ", source_frame=" + summary.source_frame +
-              ", status=" +
-              std::string(causal_slam::transform::ToString(summary.status)) +
-              ", transform_age_ms=" +
-              std::to_string(summary.transform_age_ms) +
-              ", receive_delay_ms=" +
-              std::to_string(summary.receive_delay_ms) +
-              ", adapter_detail=" + summary.adapter_detail +
-              ", reason=" + summary.reason,
-          .suggested_action =
-              SuggestedActionFromTransformStatus(summary.status),
+          .explanation = "The transform lookup result is not temporally safe for the "
+                         "sensor measurement timestamp.",
+          .evidence = "target_frame=" + summary.target_frame + ", source_frame=" + summary.source_frame +
+                      ", status=" + std::string(causal_slam::transform::ToString(summary.status)) + ", transform_age_ms=" +
+                      std::to_string(summary.transform_age_ms) + ", receive_delay_ms=" + std::to_string(summary.receive_delay_ms) +
+                      ", adapter_detail=" + summary.adapter_detail + ", reason=" + summary.reason,
+          .suggested_action = SuggestedActionFromTransformStatus(summary.status),
       },
       snapshot);
 }
 
+TemporalFaultReason StreamTimingFaultReason(causal_slam::telemetry::TemporalStreamId stream_id) {
+  switch (stream_id) {
+    case causal_slam::telemetry::TemporalStreamId::kImu:
+      return TemporalFaultReason::kImuStreamTimingUnstable;
+
+    case causal_slam::telemetry::TemporalStreamId::kLidar:
+      return TemporalFaultReason::kLidarStreamTimingUnstable;
+
+    case causal_slam::telemetry::TemporalStreamId::kUnknown:
+    case causal_slam::telemetry::TemporalStreamId::kCamera:
+    case causal_slam::telemetry::TemporalStreamId::kRadar:
+    case causal_slam::telemetry::TemporalStreamId::kGnss:
+    case causal_slam::telemetry::TemporalStreamId::kTf:
+      return TemporalFaultReason::kStreamTimingUnstable;
+  }
+
+  return TemporalFaultReason::kStreamTimingUnstable;
+}
+
+std::string StreamDisplayName(causal_slam::telemetry::TemporalStreamId stream_id) {
+  switch (stream_id) {
+    case causal_slam::telemetry::TemporalStreamId::kImu:
+      return "IMU";
+
+    case causal_slam::telemetry::TemporalStreamId::kLidar:
+      return "LiDAR";
+
+    case causal_slam::telemetry::TemporalStreamId::kCamera:
+      return "Camera";
+
+    case causal_slam::telemetry::TemporalStreamId::kRadar:
+      return "Radar";
+
+    case causal_slam::telemetry::TemporalStreamId::kGnss:
+      return "GNSS";
+
+    case causal_slam::telemetry::TemporalStreamId::kTf:
+      return "TF";
+
+    case causal_slam::telemetry::TemporalStreamId::kUnknown:
+      return "Unknown";
+  }
+
+  return std::string{causal_slam::telemetry::ToString(stream_id)};
+}
 }  // namespace
 
 const char* ToString(TemporalDiagnosticSeverity severity) {
@@ -233,6 +246,10 @@ const char* ToString(TemporalFaultReason reason) {
       return "none";
     case TemporalFaultReason::kStreamTimingUnstable:
       return "stream_timing_unstable";
+    case TemporalFaultReason::kImuStreamTimingUnstable:
+      return "imu_stream_timing_unstable";
+    case TemporalFaultReason::kLidarStreamTimingUnstable:
+      return "lidar_stream_timing_unstable";
     case TemporalFaultReason::kNoLidarScanReceivedYet:
       return "no_lidar_scan_received_yet";
     case TemporalFaultReason::kImuWindowIncomplete:
@@ -256,8 +273,7 @@ const char* ToString(TemporalFaultReason reason) {
   return "unknown";
 }
 
-TemporalDiagnosticSnapshot TemporalDiagnosticsBuilder::Build(
-    const causal_slam::model::TemporalObservation& observation) const {
+TemporalDiagnosticSnapshot TemporalDiagnosticsBuilder::Build(const causal_slam::model::TemporalObservation& observation) const {
   TemporalDiagnosticSnapshot snapshot{
       .overall_status = causal_slam::telemetry::TemporalHealthStatus::kOk,
       .observation = observation,
@@ -265,9 +281,8 @@ TemporalDiagnosticSnapshot TemporalDiagnosticsBuilder::Build(
   };
 
   for (const auto& stream : observation.streams) {
-    AddTimingIssue(causal_slam::telemetry::ToString(stream.id),
-                   stream.timing,
-                   &snapshot.issues);
+    AddTimingIssue(std::string{causal_slam::telemetry::ToString(stream.id)}, StreamDisplayName(stream.id),
+                   StreamTimingFaultReason(stream.id), stream.timing, &snapshot.issues);
   }
 
   if (!observation.imu_coverage.has_value()) {
@@ -276,17 +291,13 @@ TemporalDiagnosticSnapshot TemporalDiagnosticsBuilder::Build(
             .severity = TemporalDiagnosticSeverity::kInvalid,
             .reason = TemporalFaultReason::kNoLidarScanReceivedYet,
             .title = "LiDAR scan has not been received yet",
-            .explanation =
-                "IMU coverage cannot be evaluated before the first LiDAR scan "
-                "window is available.",
-            .evidence =
-                "imu_buffer_size=" + std::to_string(observation.imu_buffer_size),
-            .suggested_action =
-                "Wait for LiDAR data or check the configured LiDAR topic.",
+            .explanation = "IMU coverage cannot be evaluated before the first LiDAR scan "
+                           "window is available.",
+            .evidence = "imu_buffer_size=" + std::to_string(observation.imu_buffer_size),
+            .suggested_action = "Wait for LiDAR data or check the configured LiDAR topic.",
         },
         &snapshot);
-  } else if (observation.imu_coverage->health ==
-             causal_slam::coverage::ImuCoverageHealth::kDegraded) {
+  } else if (observation.imu_coverage->health == causal_slam::coverage::ImuCoverageHealth::kDegraded) {
     const auto& imu_coverage = *observation.imu_coverage;
 
     AddIssueAndUpdateStatus(
@@ -294,28 +305,19 @@ TemporalDiagnosticSnapshot TemporalDiagnosticsBuilder::Build(
             .severity = TemporalDiagnosticSeverity::kDegraded,
             .reason = TemporalFaultReason::kImuWindowIncomplete,
             .title = "IMU does not properly cover the LiDAR scan window",
-            .explanation =
-                "Deskew and LiDAR-inertial fusion may be unreliable when IMU "
-                "samples do not cover the scan interval.",
-            .evidence =
-                "reason=" + imu_coverage.reason +
-                ", imu_count_in_window=" +
-                std::to_string(imu_coverage.imu_count_in_window) +
-                ", missing_prefix_ms=" +
-                std::to_string(imu_coverage.missing_prefix_ms) +
-                ", missing_suffix_ms=" +
-                std::to_string(imu_coverage.missing_suffix_ms) +
-                ", max_gap_inside_ms=" +
-                std::to_string(imu_coverage.max_gap_inside_ms),
-            .suggested_action =
-                "Check IMU topic, timestamp base, sensor synchronization, and "
-                "expected IMU period configuration.",
+            .explanation = "Deskew and LiDAR-inertial fusion may be unreliable when IMU "
+                           "samples do not cover the scan interval.",
+            .evidence = "reason=" + imu_coverage.reason + ", imu_count_in_window=" + std::to_string(imu_coverage.imu_count_in_window) +
+                        ", missing_prefix_ms=" + std::to_string(imu_coverage.missing_prefix_ms) +
+                        ", missing_suffix_ms=" + std::to_string(imu_coverage.missing_suffix_ms) +
+                        ", max_gap_inside_ms=" + std::to_string(imu_coverage.max_gap_inside_ms),
+            .suggested_action = "Check IMU topic, timestamp base, sensor synchronization, and "
+                                "expected IMU period configuration.",
         },
         &snapshot);
   }
 
-  if (observation.lidar_point_time.has_value() &&
-      observation.lidar_point_time->has_time_candidate &&
+  if (observation.lidar_point_time.has_value() && observation.lidar_point_time->has_time_candidate &&
       !observation.lidar_point_time->has_supported_time_field) {
     const auto& point_time = *observation.lidar_point_time;
 
@@ -323,8 +325,7 @@ TemporalDiagnosticSnapshot TemporalDiagnosticsBuilder::Build(
         "Use a supported point time representation, preferably FLOAT64 "
         "absolute seconds or UINT32 offset_time in nanoseconds.";
 
-    if (point_time.inspection_reason ==
-        "absolute_float32_timestamp_precision_unsafe") {
+    if (point_time.inspection_reason == "absolute_float32_timestamp_precision_unsafe") {
       action =
           "Do not use FLOAT32 for absolute Unix-time-like timestamps. Use "
           "FLOAT64 timestamp or integer offset_time instead.";
@@ -335,21 +336,16 @@ TemporalDiagnosticSnapshot TemporalDiagnosticsBuilder::Build(
             .severity = TemporalDiagnosticSeverity::kWarning,
             .reason = TemporalFaultReason::kLidarPointTimeUnsupported,
             .title = "LiDAR point timestamps were detected but not trusted",
-            .explanation =
-                "The cloud contains a time-like field, but the monitor "
-                "rejected it as unsafe or unsupported.",
-            .evidence =
-                "field=" + point_time.field_name +
-                ", datatype=" + point_time.field_datatype +
-                ", role=" + point_time.field_role +
-                ", reason=" + point_time.inspection_reason,
+            .explanation = "The cloud contains a time-like field, but the monitor "
+                           "rejected it as unsafe or unsupported.",
+            .evidence = "field=" + point_time.field_name + ", datatype=" + point_time.field_datatype + ", role=" + point_time.field_role +
+                        ", reason=" + point_time.inspection_reason,
             .suggested_action = action,
         },
         &snapshot);
   }
 
-  if (observation.lidar_point_time.has_value() &&
-      observation.lidar_point_time->extraction_attempted &&
+  if (observation.lidar_point_time.has_value() && observation.lidar_point_time->extraction_attempted &&
       !observation.lidar_point_time->extraction_used) {
     const auto& point_time = *observation.lidar_point_time;
 
@@ -358,22 +354,17 @@ TemporalDiagnosticSnapshot TemporalDiagnosticsBuilder::Build(
             .severity = TemporalDiagnosticSeverity::kWarning,
             .reason = TemporalFaultReason::kLidarPointTimeExtractionFailed,
             .title = "LiDAR point time extraction failed",
-            .explanation =
-                "A supported point time field was selected, but it did not "
-                "produce a valid scan window.",
-            .evidence =
-                "reason=" + point_time.extraction_reason +
-                ", unit=" + point_time.extraction_unit,
-            .suggested_action =
-                "Check PointCloud2 point_step, field offset, field datatype, "
-                "and cloud data size.",
+            .explanation = "A supported point time field was selected, but it did not "
+                           "produce a valid scan window.",
+            .evidence = "reason=" + point_time.extraction_reason + ", unit=" + point_time.extraction_unit,
+            .suggested_action = "Check PointCloud2 point_step, field offset, field datatype, "
+                                "and cloud data size.",
         },
         &snapshot);
   }
 
   if (observation.lidar_scan_window.has_value() &&
-      observation.lidar_scan_window->confidence ==
-          causal_slam::lidar::LidarScanWindowConfidence::kLow) {
+      observation.lidar_scan_window->confidence == causal_slam::lidar::LidarScanWindowConfidence::kLow) {
     const auto& scan_window = *observation.lidar_scan_window;
 
     AddIssueAndUpdateStatus(
@@ -381,17 +372,12 @@ TemporalDiagnosticSnapshot TemporalDiagnosticsBuilder::Build(
             .severity = TemporalDiagnosticSeverity::kWarning,
             .reason = TemporalFaultReason::kLidarScanWindowLowConfidence,
             .title = "LiDAR scan window has low confidence",
-            .explanation =
-                "The scan interval is estimated from fallback assumptions, "
-                "not from point timestamps or measured scan metadata.",
-            .evidence =
-                "source=" +
-                std::string(causal_slam::lidar::ToString(scan_window.source)) +
-                ", reason=" + scan_window.reason +
-                ", duration_ms=" + std::to_string(scan_window.duration_ms),
-            .suggested_action =
-                "Prefer per-point timestamps, driver metadata, or validated "
-                "measured header period.",
+            .explanation = "The scan interval is estimated from fallback assumptions, "
+                           "not from point timestamps or measured scan metadata.",
+            .evidence = "source=" + std::string(causal_slam::lidar::ToString(scan_window.source)) + ", reason=" + scan_window.reason +
+                        ", duration_ms=" + std::to_string(scan_window.duration_ms),
+            .suggested_action = "Prefer per-point timestamps, driver metadata, or validated "
+                                "measured header period.",
         },
         &snapshot);
   }
@@ -401,8 +387,7 @@ TemporalDiagnosticSnapshot TemporalDiagnosticsBuilder::Build(
   }
 
   for (const auto& issue : snapshot.issues) {
-    snapshot.overall_status = MaxStatus(
-        snapshot.overall_status, StatusFromSeverity(issue.severity));
+    snapshot.overall_status = MaxStatus(snapshot.overall_status, StatusFromSeverity(issue.severity));
   }
 
   return snapshot;

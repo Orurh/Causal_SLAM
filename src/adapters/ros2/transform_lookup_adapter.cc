@@ -1,14 +1,13 @@
 #include "transform_lookup_adapter.h"
 
 #include <rcl/time.h>
-#include <rclcpp/time.hpp>
 #include <tf2/exceptions.h>
+#include <rclcpp/time.hpp>
 
 namespace causal_slam::ros_adapters {
 namespace {
 
-causal_slam::transform::TransformLookupObservation MakeBaseObservation(
-    const TransformLookupRequest& request) {
+causal_slam::transform::TransformLookupObservation MakeBaseObservation(const TransformLookupRequest& request) {
   causal_slam::transform::TransformLookupObservation observation;
   observation.target_frame = request.target_frame;
   observation.source_frame = request.source_frame;
@@ -19,9 +18,7 @@ causal_slam::transform::TransformLookupObservation MakeBaseObservation(
 
 }  // namespace
 
-causal_slam::transform::TransformLookupObservation LookupTransform(
-    tf2_ros::Buffer& tf_buffer,
-    const TransformLookupRequest& request) {
+causal_slam::transform::TransformLookupObservation LookupTransform(tf2_ros::Buffer& tf_buffer, const TransformLookupRequest& request) {
   auto observation = MakeBaseObservation(request);
 
   if (request.target_frame.empty()) {
@@ -39,19 +36,13 @@ causal_slam::transform::TransformLookupObservation LookupTransform(
   }
 
   try {
-    const auto requested_time =
-        rclcpp::Time(request.requested_stamp_ns, RCL_ROS_TIME);
+    const auto requested_time = rclcpp::Time(request.requested_stamp_ns, RCL_ROS_TIME);
 
-    const auto transform =
-        tf_buffer.lookupTransform(
-            request.target_frame,
-            request.source_frame,
-            requested_time);
+    const auto transform = tf_buffer.lookupTransform(request.target_frame, request.source_frame, requested_time);
 
     observation.lookup_success = true;
     observation.extrapolation_required = false;
-    observation.transform_stamp_ns =
-        rclcpp::Time(transform.header.stamp).nanoseconds();
+    observation.transform_stamp_ns = rclcpp::Time(transform.header.stamp).nanoseconds();
     observation.failure_reason = "";
     return observation;
   } catch (const tf2::ExtrapolationException& error) {

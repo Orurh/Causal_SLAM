@@ -13,31 +13,23 @@
 namespace causal_slam::pointcloud {
 namespace {
 
-
 std::optional<std::int64_t> SecondsToNanoseconds(double seconds) {
   if (!std::isfinite(seconds)) {
     return std::nullopt;
   }
 
-  constexpr double max_seconds =
-      static_cast<double>(std::numeric_limits<std::int64_t>::max()) /
-      core::kNanosecondsPerSecond;
-  constexpr double min_seconds =
-      static_cast<double>(std::numeric_limits<std::int64_t>::min()) /
-      core::kNanosecondsPerSecond;
+  constexpr double max_seconds = static_cast<double>(std::numeric_limits<std::int64_t>::max()) / core::kNanosecondsPerSecond;
+  constexpr double min_seconds = static_cast<double>(std::numeric_limits<std::int64_t>::min()) / core::kNanosecondsPerSecond;
 
   if (seconds > max_seconds || seconds < min_seconds) {
     return std::nullopt;
   }
 
-  return static_cast<std::int64_t>(
-      core::SecondsToNanoseconds(seconds));
+  return static_cast<std::int64_t>(core::SecondsToNanoseconds(seconds));
 }
 
 std::uint32_t PointCount(const PointCloud2CloudView& cloud) {
-  const std::uint64_t point_count =
-      static_cast<std::uint64_t>(cloud.width) *
-      static_cast<std::uint64_t>(cloud.height);
+  const std::uint64_t point_count = static_cast<std::uint64_t>(cloud.width) * static_cast<std::uint64_t>(cloud.height);
 
   if (point_count > std::numeric_limits<std::uint32_t>::max()) {
     return std::numeric_limits<std::uint32_t>::max();
@@ -51,84 +43,60 @@ bool HasEnoughData(const PointCloud2CloudView& cloud, std::uint32_t point_count)
     return true;
   }
 
-  const std::size_t required_size =
-      static_cast<std::size_t>(point_count) *
-      static_cast<std::size_t>(cloud.point_step);
+  const std::size_t required_size = static_cast<std::size_t>(point_count) * static_cast<std::size_t>(cloud.point_step);
 
   return cloud.data != nullptr && cloud.data_size >= required_size;
 }
 
 template <typename T>
-T ReadScalarUnchecked(
-    const PointCloud2CloudView& cloud,
-    std::uint32_t point_index,
-    std::uint32_t field_offset) {
+T ReadScalarUnchecked(const PointCloud2CloudView& cloud, std::uint32_t point_index, std::uint32_t field_offset) {
   const std::size_t byte_offset =
-      static_cast<std::size_t>(point_index) *
-          static_cast<std::size_t>(cloud.point_step) +
-      static_cast<std::size_t>(field_offset);
+      static_cast<std::size_t>(point_index) * static_cast<std::size_t>(cloud.point_step) + static_cast<std::size_t>(field_offset);
 
   T value{};
   std::memcpy(&value, cloud.data + byte_offset, sizeof(T));
   return value;
 }
 
-bool FieldFitsPointStep(
-    const PointCloud2FieldInfo& time_field,
-    std::uint32_t point_step,
-    std::size_t value_size) {
-  return static_cast<std::size_t>(time_field.offset) + value_size <=
-         static_cast<std::size_t>(point_step);
+bool FieldFitsPointStep(const PointCloud2FieldInfo& time_field, std::uint32_t point_step, std::size_t value_size) {
+  return static_cast<std::size_t>(time_field.offset) + value_size <= static_cast<std::size_t>(point_step);
 }
 
-std::optional<std::int64_t> ReadAbsolutePointTimeNs(
-    const PointCloud2CloudView& cloud,
-    const PointCloud2FieldInfo& time_field,
-    std::uint32_t point_index) {
+std::optional<std::int64_t> ReadAbsolutePointTimeNs(const PointCloud2CloudView& cloud, const PointCloud2FieldInfo& time_field,
+                                                    std::uint32_t point_index) {
   switch (time_field.datatype) {
     case kPointCloud2Float64:
-      return SecondsToNanoseconds(
-          ReadScalarUnchecked<double>(cloud, point_index, time_field.offset));
+      return SecondsToNanoseconds(ReadScalarUnchecked<double>(cloud, point_index, time_field.offset));
 
     case kPointCloud2Float32:
-      return SecondsToNanoseconds(static_cast<double>(
-          ReadScalarUnchecked<float>(cloud, point_index, time_field.offset)));
+      return SecondsToNanoseconds(static_cast<double>(ReadScalarUnchecked<float>(cloud, point_index, time_field.offset)));
 
     default:
       return std::nullopt;
   }
 }
 
-std::optional<std::int64_t> ReadRelativeOffsetNs(
-    const PointCloud2CloudView& cloud,
-    const PointCloud2FieldInfo& time_field,
-    std::uint32_t point_index) {
+std::optional<std::int64_t> ReadRelativeOffsetNs(const PointCloud2CloudView& cloud, const PointCloud2FieldInfo& time_field,
+                                                 std::uint32_t point_index) {
   switch (time_field.datatype) {
     case kPointCloud2Uint32:
-      return static_cast<std::int64_t>(
-          ReadScalarUnchecked<std::uint32_t>(
-              cloud, point_index, time_field.offset));
+      return static_cast<std::int64_t>(ReadScalarUnchecked<std::uint32_t>(cloud, point_index, time_field.offset));
 
     case kPointCloud2Int32:
-      return static_cast<std::int64_t>(
-          ReadScalarUnchecked<std::int32_t>(
-              cloud, point_index, time_field.offset));
+      return static_cast<std::int64_t>(ReadScalarUnchecked<std::int32_t>(cloud, point_index, time_field.offset));
 
     case kPointCloud2Float64:
-      return SecondsToNanoseconds(
-          ReadScalarUnchecked<double>(cloud, point_index, time_field.offset));
+      return SecondsToNanoseconds(ReadScalarUnchecked<double>(cloud, point_index, time_field.offset));
 
     case kPointCloud2Float32:
-      return SecondsToNanoseconds(static_cast<double>(
-          ReadScalarUnchecked<float>(cloud, point_index, time_field.offset)));
+      return SecondsToNanoseconds(static_cast<double>(ReadScalarUnchecked<float>(cloud, point_index, time_field.offset)));
 
     default:
       return std::nullopt;
   }
 }
 
-std::optional<std::size_t> TimeFieldValueSize(
-    const PointCloud2FieldInfo& time_field) {
+std::optional<std::size_t> TimeFieldValueSize(const PointCloud2FieldInfo& time_field) {
   switch (time_field.datatype) {
     case kPointCloud2Float64:
       return sizeof(double);
@@ -183,22 +151,19 @@ const char* ToString(PointCloud2TimeFieldUnit unit) {
   return "unknown";
 }
 
-PointCloud2TimeFieldExtraction PointCloud2TimeFieldExtractor::Extract(
-    const PointCloud2CloudView& cloud,
-    const PointCloud2FieldInfo& time_field) const {
+PointCloud2TimeFieldExtraction PointCloud2TimeFieldExtractor::Extract(const PointCloud2CloudView& cloud,
+                                                                      const PointCloud2FieldInfo& time_field) const {
   PointCloud2TimeFieldExtraction extraction;
   extraction.time_role = time_field.time_role;
   extraction.time_unit = UnitForField(time_field);
   extraction.point_count_total = PointCount(cloud);
 
-  if (time_field.time_role != PointCloud2TimeFieldRole::kPointTime &&
-      time_field.time_role != PointCloud2TimeFieldRole::kPointOffsetTime) {
+  if (time_field.time_role != PointCloud2TimeFieldRole::kPointTime && time_field.time_role != PointCloud2TimeFieldRole::kPointOffsetTime) {
     extraction.reason = "unsupported_time_field_role";
     return extraction;
   }
 
-  if (time_field.time_role == PointCloud2TimeFieldRole::kPointTime &&
-      time_field.datatype == kPointCloud2Float32) {
+  if (time_field.time_role == PointCloud2TimeFieldRole::kPointTime && time_field.datatype == kPointCloud2Float32) {
     extraction.reason = "absolute_float32_timestamp_precision_unsafe";
     return extraction;
   }
@@ -232,15 +197,13 @@ PointCloud2TimeFieldExtraction PointCloud2TimeFieldExtractor::Extract(
   std::optional<std::int64_t> min_point_time_ns;
   std::optional<std::int64_t> max_point_time_ns;
 
-  for (std::uint32_t point_index = 0; point_index < extraction.point_count_total;
-       ++point_index) {
+  for (std::uint32_t point_index = 0; point_index < extraction.point_count_total; ++point_index) {
     std::optional<std::int64_t> point_time_ns;
 
     if (time_field.time_role == PointCloud2TimeFieldRole::kPointTime) {
       point_time_ns = ReadAbsolutePointTimeNs(cloud, time_field, point_index);
     } else if (time_field.time_role == PointCloud2TimeFieldRole::kPointOffsetTime) {
-      const std::optional<std::int64_t> offset_ns =
-          ReadRelativeOffsetNs(cloud, time_field, point_index);
+      const std::optional<std::int64_t> offset_ns = ReadRelativeOffsetNs(cloud, time_field, point_index);
 
       if (offset_ns.has_value()) {
         point_time_ns = cloud.header_stamp_ns + *offset_ns;
@@ -273,9 +236,7 @@ PointCloud2TimeFieldExtraction PointCloud2TimeFieldExtractor::Extract(
   };
 
   extraction.has_scan_window = extraction.scan_window.IsValid();
-  extraction.reason = extraction.has_scan_window
-                          ? "point_time_field_extracted"
-                          : "invalid_extracted_scan_window";
+  extraction.reason = extraction.has_scan_window ? "point_time_field_extracted" : "invalid_extracted_scan_window";
 
   return extraction;
 }

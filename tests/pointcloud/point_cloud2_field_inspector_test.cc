@@ -12,11 +12,7 @@
 namespace causal_slam::pointcloud {
 namespace {
 
-PointCloud2FieldInfo Field(
-    std::string name,
-    std::uint32_t offset,
-    std::uint8_t datatype,
-    std::uint32_t count = 1) {
+PointCloud2FieldInfo Field(std::string name, std::uint32_t offset, std::uint8_t datatype, std::uint32_t count = 1) {
   return PointCloud2FieldInfo{
       .name = std::move(name),
       .offset = offset,
@@ -52,8 +48,7 @@ TEST(PointCloud2FieldInspectorCoreTest, DetectsFloat64TimestampAsSupported) {
   EXPECT_TRUE(inspection.has_time_candidate);
   EXPECT_TRUE(inspection.has_supported_time_field);
   EXPECT_EQ(inspection.primary_time_field->name, "timestamp");
-  EXPECT_EQ(inspection.primary_time_field->time_role,
-            PointCloud2TimeFieldRole::kPointTime);
+  EXPECT_EQ(inspection.primary_time_field->time_role, PointCloud2TimeFieldRole::kPointTime);
   EXPECT_EQ(inspection.reason, "supported_point_time_field_detected");
 }
 
@@ -70,8 +65,26 @@ TEST(PointCloud2FieldInspectorCoreTest, DetectsUint32OffsetTimeAsSupported) {
   EXPECT_TRUE(inspection.has_time_candidate);
   EXPECT_TRUE(inspection.has_supported_time_field);
   EXPECT_EQ(inspection.primary_time_field->name, "offset_time");
-  EXPECT_EQ(inspection.primary_time_field->time_role,
-            PointCloud2TimeFieldRole::kPointOffsetTime);
+  EXPECT_EQ(inspection.primary_time_field->time_role, PointCloud2TimeFieldRole::kPointOffsetTime);
+  EXPECT_EQ(inspection.reason, "supported_point_time_field_detected");
+}
+
+TEST(PointCloud2FieldInspectorCoreTest, DetectsOusterUint32TAsSupportedOffsetTime) {
+  const std::vector<PointCloud2FieldInfo> fields{
+      Field("x", 0, kPointCloud2Float32),          Field("y", 4, kPointCloud2Float32),       Field("z", 8, kPointCloud2Float32),
+      Field("intensity", 16, kPointCloud2Float32), Field("t", 20, kPointCloud2Uint32),       Field("reflectivity", 24, kPointCloud2Uint16),
+      Field("ring", 26, kPointCloud2Uint16),       Field("ambient", 28, kPointCloud2Uint16), Field("range", 32, kPointCloud2Uint32),
+  };
+
+  const PointCloud2FieldInspector inspector;
+  const auto inspection = inspector.Inspect(fields);
+
+  ASSERT_TRUE(inspection.primary_time_field.has_value());
+  EXPECT_TRUE(inspection.has_time_candidate);
+  EXPECT_TRUE(inspection.has_supported_time_field);
+  EXPECT_EQ(inspection.primary_time_field->name, "t");
+  EXPECT_EQ(inspection.primary_time_field->datatype, kPointCloud2Uint32);
+  EXPECT_EQ(inspection.primary_time_field->time_role, PointCloud2TimeFieldRole::kPointOffsetTime);
   EXPECT_EQ(inspection.reason, "supported_point_time_field_detected");
 }
 
@@ -107,11 +120,8 @@ TEST(PointCloud2FieldInspectorCoreTest, DetectsSplitTimePairButDoesNotSupportItY
 
 TEST(PointCloud2FieldInspectorCoreTest, IgnoresNonTimeFields) {
   const std::vector<PointCloud2FieldInfo> fields{
-      Field("x", 0, kPointCloud2Float32),
-      Field("y", 4, kPointCloud2Float32),
-      Field("z", 8, kPointCloud2Float32),
-      Field("intensity", 12, kPointCloud2Float32),
-      Field("ring", 16, kPointCloud2Uint16),
+      Field("x", 0, kPointCloud2Float32),          Field("y", 4, kPointCloud2Float32),    Field("z", 8, kPointCloud2Float32),
+      Field("intensity", 12, kPointCloud2Float32), Field("ring", 16, kPointCloud2Uint16),
   };
 
   const PointCloud2FieldInspector inspector;

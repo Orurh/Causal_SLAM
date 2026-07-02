@@ -8,7 +8,7 @@ TemporalMonitorRuntimeDefaults MakeDefaultTemporalMonitorRuntimeDefaults() {
   // Conservative online SLAM defaults. These are application presets, not
   // mathematical constants. Tune them per robot/sensor latency budget.
   defaults.summary_period_ms = 2000.0;
-  defaults.expected_imu_period_ms = 5.0;        // 200 Hz IMU.
+  defaults.expected_imu_period_ms = 5.0;  // 200 Hz IMU.
   defaults.imu_buffer_retention_ms = 5000.0;
   defaults.gate_min_total_imu_samples_before_forward = 5;
   defaults.gate_min_window_imu_samples_before_forward = 2;

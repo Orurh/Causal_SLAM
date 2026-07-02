@@ -3,18 +3,14 @@
 #include "domain/time/time_units.h"
 
 namespace causal_slam::ros_adapters {
-namespace {
+namespace {}  // namespace
 
-}  // namespace
-
-std::int64_t HeaderStampToNanoseconds(
-    const builtin_interfaces::msg::Time& stamp) {
+std::int64_t HeaderStampToNanoseconds(const builtin_interfaces::msg::Time& stamp) {
   return static_cast<std::int64_t>(stamp.sec) * static_cast<std::int64_t>(causal_slam::core::kNanosecondsPerSecond) +
          static_cast<std::int64_t>(stamp.nanosec);
 }
 
-std::vector<causal_slam::pointcloud::PointCloud2FieldInfo>
-ToPointCloud2FieldInfos(const sensor_msgs::msg::PointCloud2& cloud) {
+std::vector<causal_slam::pointcloud::PointCloud2FieldInfo> ToPointCloud2FieldInfos(const sensor_msgs::msg::PointCloud2& cloud) {
   std::vector<causal_slam::pointcloud::PointCloud2FieldInfo> fields;
   fields.reserve(cloud.fields.size());
 
@@ -30,8 +26,7 @@ ToPointCloud2FieldInfos(const sensor_msgs::msg::PointCloud2& cloud) {
   return fields;
 }
 
-causal_slam::pointcloud::PointCloud2CloudView ToPointCloud2CloudView(
-    const sensor_msgs::msg::PointCloud2& cloud) {
+causal_slam::pointcloud::PointCloud2CloudView ToPointCloud2CloudView(const sensor_msgs::msg::PointCloud2& cloud) {
   return causal_slam::pointcloud::PointCloud2CloudView{
       .header_stamp_ns = HeaderStampToNanoseconds(cloud.header.stamp),
       .width = cloud.width,

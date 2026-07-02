@@ -52,7 +52,6 @@ struct TemporalMonitorRuntimeDefaults {
   TemporalMonitorRuntimeLimits limits;
 };
 
-[[nodiscard]] TemporalMonitorRuntimeDefaults
-MakeDefaultTemporalMonitorRuntimeDefaults();
+[[nodiscard]] TemporalMonitorRuntimeDefaults MakeDefaultTemporalMonitorRuntimeDefaults();
 
 }  // namespace causal_slam::config

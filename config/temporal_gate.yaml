@@ -144,6 +144,24 @@ temporal_monitor:
     #   scan_end     - header.stamp is the end of the scan
     lidar_stamp_policy: "scan_end"
 
+        # PointCloud2 per-point time detection.
+    # auto:
+    #   Detect known fields automatically:
+    #   - timestamp/time as absolute point time
+    #   - t/offset_time/time_offset/offsettime as relative point offset time
+    # explicit:
+    #   Use lidar_point_time_field with the interpretation/unit below.
+    # disabled:
+    #   Ignore per-point time and use scan-window fallback logic.
+    lidar_point_time_mode: "auto"
+    lidar_point_time_field: ""
+    lidar_point_time_interpretation: "auto"
+    lidar_point_time_unit: "auto"
+
+    lidar_holdback_enabled: false
+    lidar_holdback_tolerance_ms: 10.0
+    lidar_holdback_max_pending: 32
+
     # -------------------------------------------------------------------------
     # IMU coverage over LiDAR scan window.
     # -------------------------------------------------------------------------

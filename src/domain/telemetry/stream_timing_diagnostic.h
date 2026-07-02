@@ -12,9 +12,7 @@ struct StreamTimingDiagnostic {
   TimingSummary timing;
 };
 
-[[nodiscard]] inline StreamTimingDiagnostic MakeStreamTimingDiagnostic(
-    TemporalStreamId id,
-    TimingSummary timing) {
+[[nodiscard]] inline StreamTimingDiagnostic MakeStreamTimingDiagnostic(TemporalStreamId id, TimingSummary timing) {
   return StreamTimingDiagnostic{
       .id = id,
       .timing = std::move(timing),

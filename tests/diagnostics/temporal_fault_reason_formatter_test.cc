@@ -5,10 +5,7 @@
 namespace causal_slam::diagnostics {
 namespace {
 
-TemporalDiagnosticIssue MakeIssue(
-    TemporalDiagnosticSeverity severity,
-    TemporalFaultReason reason,
-    const std::string& title) {
+TemporalDiagnosticIssue MakeIssue(TemporalDiagnosticSeverity severity, TemporalFaultReason reason, const std::string& title) {
   TemporalDiagnosticIssue issue;
   issue.severity = severity;
   issue.reason = reason;
@@ -25,9 +22,7 @@ TEST(TemporalFaultReasonFormatterTest, EmptyIssuesProducesNone) {
 
 TEST(TemporalFaultReasonFormatterTest, SingleIssueProducesReason) {
   const std::vector<TemporalDiagnosticIssue> issues{
-      MakeIssue(TemporalDiagnosticSeverity::kDegraded,
-                TemporalFaultReason::kImuWindowIncomplete,
-                "test"),
+      MakeIssue(TemporalDiagnosticSeverity::kDegraded, TemporalFaultReason::kImuWindowIncomplete, "test"),
   };
 
   EXPECT_EQ(JoinFaultReasons(issues), "imu_window_incomplete");
@@ -35,16 +30,11 @@ TEST(TemporalFaultReasonFormatterTest, SingleIssueProducesReason) {
 
 TEST(TemporalFaultReasonFormatterTest, MultipleIssuesAreCommaSeparated) {
   const std::vector<TemporalDiagnosticIssue> issues{
-      MakeIssue(TemporalDiagnosticSeverity::kDegraded,
-                TemporalFaultReason::kStreamTimingUnstable,
-                "stream"),
-      MakeIssue(TemporalDiagnosticSeverity::kDegraded,
-                TemporalFaultReason::kImuWindowIncomplete,
-                "coverage"),
+      MakeIssue(TemporalDiagnosticSeverity::kDegraded, TemporalFaultReason::kStreamTimingUnstable, "stream"),
+      MakeIssue(TemporalDiagnosticSeverity::kDegraded, TemporalFaultReason::kImuWindowIncomplete, "coverage"),
   };
 
-  EXPECT_EQ(JoinFaultReasons(issues),
-            "stream_timing_unstable,imu_window_incomplete");
+  EXPECT_EQ(JoinFaultReasons(issues), "stream_timing_unstable,imu_window_incomplete");
 }
 
 }  // namespace

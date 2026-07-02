@@ -33,8 +33,7 @@ struct MapUpdateDecision {
   return "unknown";
 }
 
-[[nodiscard]] inline MapUpdateDecision DecideMapUpdate(
-    causal_slam::telemetry::TemporalHealthStatus status) {
+[[nodiscard]] inline MapUpdateDecision DecideMapUpdate(causal_slam::telemetry::TemporalHealthStatus status) {
   using causal_slam::telemetry::TemporalHealthStatus;
 
   switch (status) {

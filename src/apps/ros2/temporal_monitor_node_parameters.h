@@ -51,6 +51,15 @@ struct TemporalMonitorNodeParameters {
   bool lidar_prefer_measured_header_period{true};
   causal_slam::lidar::LidarStampPolicy lidar_stamp_policy{causal_slam::lidar::LidarStampPolicy::kScanEnd};
 
+  std::string lidar_point_time_mode{"auto"};
+  std::string lidar_point_time_field;
+  std::string lidar_point_time_interpretation{"auto"};
+  std::string lidar_point_time_unit{"auto"};
+
+  bool lidar_holdback_enabled{false};
+  double lidar_holdback_tolerance_ms{10.0};
+  int lidar_holdback_max_pending{32};
+
   double expected_imu_period_ms{5.0};
   double imu_buffer_retention_ms{5000.0};
   double max_missing_prefix_ms{10.0};

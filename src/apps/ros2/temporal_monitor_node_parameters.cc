@@ -3,6 +3,7 @@
 #include "domain/time/time_units.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -88,6 +89,42 @@ const char* ToString(RuntimeProfile profile) {
   return "debug_report";
 }
 
+pointcloud::PointCloud2TimeFieldOverrideMode ParsePointTimeMode(const std::string& value) {
+  if (value == "explicit") {
+    return pointcloud::PointCloud2TimeFieldOverrideMode::kExplicit;
+  }
+
+  if (value == "disabled") {
+    return pointcloud::PointCloud2TimeFieldOverrideMode::kDisabled;
+  }
+
+  return pointcloud::PointCloud2TimeFieldOverrideMode::kAuto;
+}
+
+pointcloud::PointCloud2TimeFieldOverrideInterpretation ParsePointTimeInterpretation(const std::string& value) {
+  if (value == "absolute") {
+    return pointcloud::PointCloud2TimeFieldOverrideInterpretation::kAbsolute;
+  }
+
+  if (value == "relative") {
+    return pointcloud::PointCloud2TimeFieldOverrideInterpretation::kRelative;
+  }
+
+  return pointcloud::PointCloud2TimeFieldOverrideInterpretation::kAuto;
+}
+
+pointcloud::PointCloud2TimeFieldOverrideUnit ParsePointTimeUnit(const std::string& value) {
+  if (value == "seconds") {
+    return pointcloud::PointCloud2TimeFieldOverrideUnit::kSeconds;
+  }
+
+  if (value == "nanoseconds") {
+    return pointcloud::PointCloud2TimeFieldOverrideUnit::kNanoseconds;
+  }
+
+  return pointcloud::PointCloud2TimeFieldOverrideUnit::kAuto;
+}
+
 TemporalMonitorNodeParameters LoadTemporalMonitorNodeParameters(rclcpp::Node& node) {
   const auto defaults = config::MakeDefaultTemporalMonitorRuntimeDefaults();
 
@@ -148,6 +185,18 @@ TemporalMonitorNodeParameters LoadTemporalMonitorNodeParameters(rclcpp::Node& no
       "lidar_stamp_policy", std::string{lidar::ToString(defaults.pipeline.lidar_scan_window.stamp_policy)});
   params.lidar_stamp_policy = ParseLidarStampPolicy(lidar_stamp_policy);
 
+  params.lidar_point_time_mode = node.declare_parameter<std::string>("lidar_point_time_mode", "auto");
+  params.lidar_point_time_field = node.declare_parameter<std::string>("lidar_point_time_field", "");
+  params.lidar_point_time_interpretation = node.declare_parameter<std::string>("lidar_point_time_interpretation", "auto");
+  params.lidar_point_time_unit = node.declare_parameter<std::string>("lidar_point_time_unit", "auto");
+
+  params.lidar_holdback_enabled = node.declare_parameter<bool>("lidar_holdback_enabled", false);
+
+  const double lidar_holdback_tolerance_ms = node.declare_parameter<double>("lidar_holdback_tolerance_ms", 10.0);
+  params.lidar_holdback_tolerance_ms = std::max(lidar_holdback_tolerance_ms, 0.0);
+
+  const auto lidar_holdback_max_pending = node.declare_parameter<int>("lidar_holdback_max_pending", 32);
+  params.lidar_holdback_max_pending = static_cast<int>(std::max<std::int64_t>(lidar_holdback_max_pending, 1));
   const double imu_buffer_retention_ms = node.declare_parameter<double>("imu_buffer_retention_ms", defaults.imu_buffer_retention_ms);
   params.imu_buffer_retention_ms = std::max(imu_buffer_retention_ms, defaults.limits.min_imu_buffer_retention_ms);
 
@@ -199,6 +248,12 @@ TemporalMonitorNodeParameters LoadTemporalMonitorNodeParameters(rclcpp::Node& no
       .max_measured_scan_duration_ms = params.lidar_max_measured_scan_duration_ms,
       .stamp_policy = params.lidar_stamp_policy,
       .prefer_measured_header_period = params.lidar_prefer_measured_header_period,
+  };
+  params.pipeline_config.point_time = pointcloud::PointCloud2TimeFieldOverrideConfig{
+      .mode = ParsePointTimeMode(params.lidar_point_time_mode),
+      .field_name = params.lidar_point_time_field,
+      .interpretation = ParsePointTimeInterpretation(params.lidar_point_time_interpretation),
+      .unit = ParsePointTimeUnit(params.lidar_point_time_unit),
   };
   params.pipeline_config.imu_coverage = coverage::ImuCoverageConfig{
       .max_missing_prefix_ms = params.max_missing_prefix_ms,

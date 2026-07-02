@@ -12,25 +12,16 @@ namespace causal_slam::pointcloud {
 namespace {
 
 template <typename T>
-void WriteValue(
-    std::vector<std::uint8_t>* data,
-    std::uint32_t point_step,
-    std::uint32_t point_index,
-    std::uint32_t field_offset,
-    const T& value) {
+void WriteValue(std::vector<std::uint8_t>* data, std::uint32_t point_step, std::uint32_t point_index, std::uint32_t field_offset,
+                const T& value) {
   const std::size_t byte_offset =
-      static_cast<std::size_t>(point_index) *
-          static_cast<std::size_t>(point_step) +
-      static_cast<std::size_t>(field_offset);
+      static_cast<std::size_t>(point_index) * static_cast<std::size_t>(point_step) + static_cast<std::size_t>(field_offset);
 
   std::memcpy(data->data() + byte_offset, &value, sizeof(T));
 }
 
-PointCloud2CloudView MakeView(
-    std::int64_t header_stamp_ns,
-    std::uint32_t point_count,
-    std::uint32_t point_step,
-    const std::vector<std::uint8_t>& data) {
+PointCloud2CloudView MakeView(std::int64_t header_stamp_ns, std::uint32_t point_count, std::uint32_t point_step,
+                              const std::vector<std::uint8_t>& data) {
   return PointCloud2CloudView{
       .header_stamp_ns = header_stamp_ns,
       .width = point_count,
@@ -64,6 +55,16 @@ PointCloud2FieldInfo TimestampFloat32Field(std::uint32_t offset) {
 PointCloud2FieldInfo OffsetTimeUint32Field(std::uint32_t offset) {
   return PointCloud2FieldInfo{
       .name = "offset_time",
+      .offset = offset,
+      .datatype = kPointCloud2Uint32,
+      .count = 1,
+      .time_role = PointCloud2TimeFieldRole::kPointOffsetTime,
+  };
+}
+
+PointCloud2FieldInfo OusterTUint32Field(std::uint32_t offset) {
+  return PointCloud2FieldInfo{
+      .name = "t",
       .offset = offset,
       .datatype = kPointCloud2Uint32,
       .count = 1,
@@ -114,6 +115,32 @@ TEST(PointCloud2TimeFieldExtractorCoreTest, ExtractsOffsetTimeUint32WindowFromHe
   EXPECT_TRUE(result.has_scan_window);
   EXPECT_EQ(result.scan_window.start_ns, 20'100'000'000LL);
   EXPECT_EQ(result.scan_window.end_ns, 20'200'000'000LL);
+  EXPECT_EQ(result.point_count_total, 3U);
+  EXPECT_EQ(result.point_count_used, 3U);
+  EXPECT_EQ(result.time_unit, PointCloud2TimeFieldUnit::kRelativeNanoseconds);
+  EXPECT_EQ(result.reason, "point_time_field_extracted");
+}
+
+TEST(PointCloud2TimeFieldExtractorCoreTest, ExtractsOusterUint32TWindowFromHeaderStamp) {
+  constexpr std::int64_t header_stamp_ns = 360'000'000'000LL;
+  constexpr std::uint32_t point_count = 3;
+  constexpr std::uint32_t point_step = 36;
+  constexpr std::uint32_t t_offset = 20;
+
+  std::vector<std::uint8_t> data(point_count * point_step);
+
+  WriteValue<std::uint32_t>(&data, point_step, 0, t_offset, 1'000U);
+  WriteValue<std::uint32_t>(&data, point_step, 1, t_offset, 50'000'000U);
+  WriteValue<std::uint32_t>(&data, point_step, 2, t_offset, 99'000'000U);
+
+  const auto view = MakeView(header_stamp_ns, point_count, point_step, data);
+
+  const PointCloud2TimeFieldExtractor extractor;
+  const auto result = extractor.Extract(view, OusterTUint32Field(t_offset));
+
+  EXPECT_TRUE(result.has_scan_window);
+  EXPECT_EQ(result.scan_window.start_ns, 360'000'001'000LL);
+  EXPECT_EQ(result.scan_window.end_ns, 360'099'000'000LL);
   EXPECT_EQ(result.point_count_total, 3U);
   EXPECT_EQ(result.point_count_used, 3U);
   EXPECT_EQ(result.time_unit, PointCloud2TimeFieldUnit::kRelativeNanoseconds);

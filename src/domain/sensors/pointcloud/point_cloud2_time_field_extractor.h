@@ -4,8 +4,8 @@
 #include <cstdint>
 #include <string>
 
-#include "domain/time/time_window.h"
 #include "domain/sensors/pointcloud/point_cloud2_field_inspector.h"
+#include "domain/time/time_window.h"
 
 namespace causal_slam::pointcloud {
 
@@ -44,9 +44,7 @@ struct PointCloud2TimeFieldExtraction {
 
 class PointCloud2TimeFieldExtractor final {
  public:
-  [[nodiscard]] PointCloud2TimeFieldExtraction Extract(
-      const PointCloud2CloudView& cloud,
-      const PointCloud2FieldInfo& time_field) const;
+  [[nodiscard]] PointCloud2TimeFieldExtraction Extract(const PointCloud2CloudView& cloud, const PointCloud2FieldInfo& time_field) const;
 };
 
 }  // namespace causal_slam::pointcloud

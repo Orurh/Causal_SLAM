@@ -18,12 +18,9 @@ TEST(TemporalMonitorRuntimeDefaultsTest, ProvidesStableApplicationDefaults) {
   EXPECT_DOUBLE_EQ(defaults.pipeline.imu_gap_threshold_ms, 100.0);
   EXPECT_DOUBLE_EQ(defaults.pipeline.lidar_gap_threshold_ms, 500.0);
 
-  EXPECT_DOUBLE_EQ(
-      defaults.pipeline.lidar_scan_window.fallback_scan_duration_ms, 100.0);
-  EXPECT_DOUBLE_EQ(
-      defaults.pipeline.transform_age.max_transform_age_ms, 50.0);
-  EXPECT_DOUBLE_EQ(
-      defaults.pipeline.transform_age.max_future_tolerance_ms, 1.0);
+  EXPECT_DOUBLE_EQ(defaults.pipeline.lidar_scan_window.fallback_scan_duration_ms, 100.0);
+  EXPECT_DOUBLE_EQ(defaults.pipeline.transform_age.max_transform_age_ms, 50.0);
+  EXPECT_DOUBLE_EQ(defaults.pipeline.transform_age.max_future_tolerance_ms, 1.0);
 
   ASSERT_EQ(defaults.tf_target_frames.size(), 1U);
   ASSERT_EQ(defaults.tf_source_frames.size(), 1U);

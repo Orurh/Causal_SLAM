@@ -61,8 +61,7 @@ const char* ToString(TimingHealth health) {
 
 void StreamTimingTracker::SetGapThresholdMs(double threshold_ms) {
   const double safe_threshold_ms = std::max(threshold_ms, kMinGapThresholdMs);
-  gap_threshold_ns_ = static_cast<std::int64_t>(
-      static_cast<double>(core::MillisecondsToNanoseconds(safe_threshold_ms)));
+  gap_threshold_ns_ = static_cast<std::int64_t>(static_cast<double>(core::MillisecondsToNanoseconds(safe_threshold_ms)));
 }
 
 void StreamTimingTracker::Observe(const TimingSample& sample) {
@@ -95,8 +94,7 @@ void StreamTimingTracker::Observe(const TimingSample& sample) {
       last_period_ms_ = core::NanosecondsToMilliseconds(period_ns);
 
       if (previous_period_ns_.has_value()) {
-        const std::int64_t jitter_ns =
-            AbsNanoseconds(period_ns - *previous_period_ns_);
+        const std::int64_t jitter_ns = AbsNanoseconds(period_ns - *previous_period_ns_);
         last_jitter_ms_ = core::NanosecondsToMilliseconds(jitter_ns);
         max_jitter_ms_ = std::max(max_jitter_ms_, last_jitter_ms_);
         window_max_jitter_ms_ = std::max(window_max_jitter_ms_, last_jitter_ms_);
@@ -112,8 +110,7 @@ void StreamTimingTracker::Observe(const TimingSample& sample) {
 }
 
 TimingSummary StreamTimingTracker::LifetimeSummary() const {
-  const double average_delay_ms =
-      count_ > 0 ? delay_sum_ms_ / static_cast<double>(count_) : 0.0;
+  const double average_delay_ms = count_ > 0 ? delay_sum_ms_ / static_cast<double>(count_) : 0.0;
 
   auto summary = TimingSummary{
       .total_count = count_,
@@ -135,10 +132,7 @@ TimingSummary StreamTimingTracker::LifetimeSummary() const {
 }
 
 TimingSummary StreamTimingTracker::CurrentWindowSummary() const {
-  const double window_average_delay_ms =
-      window_count_ > 0
-          ? window_delay_sum_ms_ / static_cast<double>(window_count_)
-          : 0.0;
+  const double window_average_delay_ms = window_count_ > 0 ? window_delay_sum_ms_ / static_cast<double>(window_count_) : 0.0;
 
   auto summary = TimingSummary{
       .total_count = count_,
@@ -160,8 +154,7 @@ TimingSummary StreamTimingTracker::CurrentWindowSummary() const {
 }
 
 TimingSummary StreamTimingTracker::ConsumeWindowSummary() {
-  const double window_average_delay_ms =
-      window_count_ > 0 ? window_delay_sum_ms_ / static_cast<double>(window_count_) : 0.0;
+  const double window_average_delay_ms = window_count_ > 0 ? window_delay_sum_ms_ / static_cast<double>(window_count_) : 0.0;
 
   auto summary = TimingSummary{
       .total_count = count_,

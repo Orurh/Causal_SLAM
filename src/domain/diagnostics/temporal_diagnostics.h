@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
-#include "domain/telemetry/temporal_health.h"
 #include "domain/model/temporal_observation.h"
+#include "domain/telemetry/temporal_health.h"
 
 namespace causal_slam::diagnostics {
 
@@ -20,6 +20,8 @@ enum class TemporalFaultReason : std::uint8_t {
   kNone,
 
   kStreamTimingUnstable,
+  kImuStreamTimingUnstable,
+  kLidarStreamTimingUnstable,
   kNoLidarScanReceivedYet,
   kImuWindowIncomplete,
 
@@ -47,8 +49,7 @@ struct TemporalDiagnosticIssue {
 };
 
 struct TemporalDiagnosticSnapshot {
-  causal_slam::telemetry::TemporalHealthStatus overall_status{
-      causal_slam::telemetry::TemporalHealthStatus::kOk};
+  causal_slam::telemetry::TemporalHealthStatus overall_status{causal_slam::telemetry::TemporalHealthStatus::kOk};
 
   // causal_slam::policy::MapUpdateDecision map_update_decision;
   causal_slam::model::TemporalObservation observation;
@@ -57,8 +58,7 @@ struct TemporalDiagnosticSnapshot {
 
 class TemporalDiagnosticsBuilder final {
  public:
-  [[nodiscard]] TemporalDiagnosticSnapshot Build(
-      const causal_slam::model::TemporalObservation& observation) const;
+  [[nodiscard]] TemporalDiagnosticSnapshot Build(const causal_slam::model::TemporalObservation& observation) const;
 };
 
 }  // namespace causal_slam::diagnostics

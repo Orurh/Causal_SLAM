@@ -48,7 +48,7 @@ class LidarScanWindowEstimator final {
  public:
   explicit LidarScanWindowEstimator(LidarScanWindowEstimatorConfig config = LidarScanWindowEstimatorConfig{});
 
-  void SetConfig(LidarScanWindowEstimatorConfig config);
+  void SetConfig(const LidarScanWindowEstimatorConfig& config);
 
   [[nodiscard]] LidarScanWindowEstimate Estimate(std::int64_t header_stamp_ns);
 

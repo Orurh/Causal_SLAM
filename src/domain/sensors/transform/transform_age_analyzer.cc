@@ -24,27 +24,19 @@ const char* ToString(TransformLookupStatus status) {
   return "unknown";
 }
 
-TransformAgeAnalyzer::TransformAgeAnalyzer(TransformAgeAnalyzerConfig config)
-    : config_(config) {
-  config_.max_transform_age_ms =
-      std::max(config_.max_transform_age_ms, 0.0);
-  config_.max_future_tolerance_ms =
-      std::max(config_.max_future_tolerance_ms, 0.0);
+TransformAgeAnalyzer::TransformAgeAnalyzer(TransformAgeAnalyzerConfig config) : config_(config) {
+  config_.max_transform_age_ms = std::max(config_.max_transform_age_ms, 0.0);
+  config_.max_future_tolerance_ms = std::max(config_.max_future_tolerance_ms, 0.0);
 }
 
-TransformAgeSummary TransformAgeAnalyzer::Analyze(
-    const TransformLookupObservation& observation) const {
+TransformAgeSummary TransformAgeAnalyzer::Analyze(const TransformLookupObservation& observation) const {
   TransformAgeSummary summary;
   summary.target_frame = observation.target_frame;
   summary.source_frame = observation.source_frame;
   summary.adapter_detail = observation.failure_reason;
 
-  summary.transform_age_ms =
-      causal_slam::core::NanosecondsToMilliseconds(
-          observation.requested_stamp_ns - observation.transform_stamp_ns);
-  summary.receive_delay_ms =
-      causal_slam::core::NanosecondsToMilliseconds(
-          observation.receive_time_ns - observation.requested_stamp_ns);
+  summary.transform_age_ms = causal_slam::core::NanosecondsToMilliseconds(observation.requested_stamp_ns - observation.transform_stamp_ns);
+  summary.receive_delay_ms = causal_slam::core::NanosecondsToMilliseconds(observation.receive_time_ns - observation.requested_stamp_ns);
 
   if (!observation.lookup_success) {
     summary.health = config_.lookup_failed_health;

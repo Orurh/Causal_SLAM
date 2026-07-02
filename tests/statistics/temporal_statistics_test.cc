@@ -17,13 +17,8 @@ std::int64_t Seconds(std::int64_t seconds) {
   return seconds * 1'000'000'000LL;
 }
 
-const StreamTimingStatistics* FindStream(
-    const TemporalWindowStatistics& stats,
-    telemetry::TemporalStreamId id) {
-  const auto it = std::find_if(
-      stats.streams.begin(), stats.streams.end(), [id](const auto& stream) {
-        return stream.id == id;
-      });
+const StreamTimingStatistics* FindStream(const TemporalWindowStatistics& stats, telemetry::TemporalStreamId id) {
+  const auto it = std::find_if(stats.streams.begin(), stats.streams.end(), [id](const auto& stream) { return stream.id == id; });
 
   if (it == stats.streams.end()) {
     return nullptr;
@@ -32,10 +27,8 @@ const StreamTimingStatistics* FindStream(
   return &*it;
 }
 
-model::TemporalObservation MakeSnapshot(
-    double lidar_delay_ms,
-    lidar::LidarScanWindowSource source,
-    lidar::LidarScanWindowConfidence confidence) {
+model::TemporalObservation MakeSnapshot(double lidar_delay_ms, lidar::LidarScanWindowSource source,
+                                        lidar::LidarScanWindowConfidence confidence) {
   model::TemporalObservation snapshot;
   telemetry::TimingSummary imu_timing;
   imu_timing.total_count = 1;
@@ -54,10 +47,8 @@ model::TemporalObservation MakeSnapshot(
   lidar_timing.last_jitter_ms = 0.2;
 
   snapshot.streams = {
-      telemetry::MakeStreamTimingDiagnostic(
-          telemetry::TemporalStreamId::kImu, imu_timing),
-      telemetry::MakeStreamTimingDiagnostic(
-          telemetry::TemporalStreamId::kLidar, lidar_timing),
+      telemetry::MakeStreamTimingDiagnostic(telemetry::TemporalStreamId::kImu, imu_timing),
+      telemetry::MakeStreamTimingDiagnostic(telemetry::TemporalStreamId::kLidar, lidar_timing),
   };
 
   coverage::ImuCoverageSummary imu_coverage;
@@ -91,35 +82,21 @@ TEST(TemporalStatisticsAggregatorTest, EmptySnapshotHasZeroCounts) {
 TEST(TemporalStatisticsAggregatorTest, ComputesNumericStats) {
   TemporalStatisticsAggregator aggregator;
 
-  aggregator.Observe(
-      Seconds(1),
-      MakeSnapshot(1.0,
-                   lidar::LidarScanWindowSource::kPointTimeField,                   lidar::LidarScanWindowConfidence::kHigh),
-      telemetry::TemporalHealthStatus::kOk);
+  aggregator.Observe(Seconds(1), MakeSnapshot(1.0, lidar::LidarScanWindowSource::kPointTimeField, lidar::LidarScanWindowConfidence::kHigh),
+                     telemetry::TemporalHealthStatus::kOk);
 
-  aggregator.Observe(
-      Seconds(2),
-      MakeSnapshot(2.0,
-                   lidar::LidarScanWindowSource::kPointTimeField,                   lidar::LidarScanWindowConfidence::kHigh),
-      telemetry::TemporalHealthStatus::kOk);
+  aggregator.Observe(Seconds(2), MakeSnapshot(2.0, lidar::LidarScanWindowSource::kPointTimeField, lidar::LidarScanWindowConfidence::kHigh),
+                     telemetry::TemporalHealthStatus::kOk);
 
-  aggregator.Observe(
-      Seconds(3),
-      MakeSnapshot(3.0,
-                   lidar::LidarScanWindowSource::kPointTimeField,                   lidar::LidarScanWindowConfidence::kHigh),
-      telemetry::TemporalHealthStatus::kOk);
+  aggregator.Observe(Seconds(3), MakeSnapshot(3.0, lidar::LidarScanWindowSource::kPointTimeField, lidar::LidarScanWindowConfidence::kHigh),
+                     telemetry::TemporalHealthStatus::kOk);
 
-  aggregator.Observe(
-      Seconds(4),
-      MakeSnapshot(4.0,
-                   lidar::LidarScanWindowSource::kPointTimeField,                   lidar::LidarScanWindowConfidence::kHigh),
-      telemetry::TemporalHealthStatus::kOk);
+  aggregator.Observe(Seconds(4), MakeSnapshot(4.0, lidar::LidarScanWindowSource::kPointTimeField, lidar::LidarScanWindowConfidence::kHigh),
+                     telemetry::TemporalHealthStatus::kOk);
 
-  aggregator.Observe(
-      Seconds(5),
-      MakeSnapshot(100.0,
-                   lidar::LidarScanWindowSource::kPointTimeField,                   lidar::LidarScanWindowConfidence::kHigh),
-      telemetry::TemporalHealthStatus::kOk);
+  aggregator.Observe(Seconds(5),
+                     MakeSnapshot(100.0, lidar::LidarScanWindowSource::kPointTimeField, lidar::LidarScanWindowConfidence::kHigh),
+                     telemetry::TemporalHealthStatus::kOk);
 
   const auto snapshot = aggregator.Snapshot(Seconds(5));
 
@@ -141,23 +118,14 @@ TEST(TemporalStatisticsAggregatorTest, RollingWindowPrunesOldSamples) {
 
   TemporalStatisticsAggregator aggregator{config};
 
-  aggregator.Observe(
-      Seconds(0),
-      MakeSnapshot(1.0,
-                   lidar::LidarScanWindowSource::kPointTimeField,                   lidar::LidarScanWindowConfidence::kHigh),
-      telemetry::TemporalHealthStatus::kOk);
+  aggregator.Observe(Seconds(0), MakeSnapshot(1.0, lidar::LidarScanWindowSource::kPointTimeField, lidar::LidarScanWindowConfidence::kHigh),
+                     telemetry::TemporalHealthStatus::kOk);
 
-  aggregator.Observe(
-      Seconds(5),
-      MakeSnapshot(2.0,
-                   lidar::LidarScanWindowSource::kPointTimeField,                   lidar::LidarScanWindowConfidence::kHigh),
-      telemetry::TemporalHealthStatus::kOk);
+  aggregator.Observe(Seconds(5), MakeSnapshot(2.0, lidar::LidarScanWindowSource::kPointTimeField, lidar::LidarScanWindowConfidence::kHigh),
+                     telemetry::TemporalHealthStatus::kOk);
 
-  aggregator.Observe(
-      Seconds(20),
-      MakeSnapshot(3.0,
-                   lidar::LidarScanWindowSource::kPointTimeField,                   lidar::LidarScanWindowConfidence::kHigh),
-      telemetry::TemporalHealthStatus::kOk);
+  aggregator.Observe(Seconds(20), MakeSnapshot(3.0, lidar::LidarScanWindowSource::kPointTimeField, lidar::LidarScanWindowConfidence::kHigh),
+                     telemetry::TemporalHealthStatus::kOk);
 
   const auto snapshot = aggregator.Snapshot(Seconds(20));
   const auto* lidar_stats = FindStream(snapshot.short_window, telemetry::TemporalStreamId::kLidar);
@@ -173,23 +141,16 @@ TEST(TemporalStatisticsAggregatorTest, RollingWindowPrunesOldSamples) {
 TEST(TemporalStatisticsAggregatorTest, CountsHealthSourceAndConfidence) {
   TemporalStatisticsAggregator aggregator;
 
-  aggregator.Observe(
-      Seconds(1),
-      MakeSnapshot(1.0,
-                   lidar::LidarScanWindowSource::kPointTimeField,                   lidar::LidarScanWindowConfidence::kHigh),
-      telemetry::TemporalHealthStatus::kOk);
+  aggregator.Observe(Seconds(1), MakeSnapshot(1.0, lidar::LidarScanWindowSource::kPointTimeField, lidar::LidarScanWindowConfidence::kHigh),
+                     telemetry::TemporalHealthStatus::kOk);
 
-  aggregator.Observe(
-      Seconds(2),
-      MakeSnapshot(2.0,
-                   lidar::LidarScanWindowSource::kMeasuredHeaderPeriod,                   lidar::LidarScanWindowConfidence::kMedium),
-      telemetry::TemporalHealthStatus::kWarning);
+  aggregator.Observe(Seconds(2),
+                     MakeSnapshot(2.0, lidar::LidarScanWindowSource::kMeasuredHeaderPeriod, lidar::LidarScanWindowConfidence::kMedium),
+                     telemetry::TemporalHealthStatus::kWarning);
 
-  aggregator.Observe(
-      Seconds(3),
-      MakeSnapshot(3.0,
-                   lidar::LidarScanWindowSource::kAssumedFixedDuration,                   lidar::LidarScanWindowConfidence::kLow),
-      telemetry::TemporalHealthStatus::kDegraded);
+  aggregator.Observe(Seconds(3),
+                     MakeSnapshot(3.0, lidar::LidarScanWindowSource::kAssumedFixedDuration, lidar::LidarScanWindowConfidence::kLow),
+                     telemetry::TemporalHealthStatus::kDegraded);
 
   const auto snapshot = aggregator.Snapshot(Seconds(3));
 
@@ -199,24 +160,18 @@ TEST(TemporalStatisticsAggregatorTest, CountsHealthSourceAndConfidence) {
   EXPECT_EQ(snapshot.session.health.invalid_count, 0u);
 
   EXPECT_EQ(snapshot.session.scan_window_sources.point_time_field_count, 1u);
-  EXPECT_EQ(snapshot.session.scan_window_sources.measured_header_period_count,
-            1u);
-  EXPECT_EQ(snapshot.session.scan_window_sources.assumed_fixed_duration_count,
-            1u);
+  EXPECT_EQ(snapshot.session.scan_window_sources.measured_header_period_count, 1u);
+  EXPECT_EQ(snapshot.session.scan_window_sources.assumed_fixed_duration_count, 1u);
 
   EXPECT_EQ(snapshot.session.scan_window_confidence.high_count, 1u);
   EXPECT_EQ(snapshot.session.scan_window_confidence.medium_count, 1u);
   EXPECT_EQ(snapshot.session.scan_window_confidence.low_count, 1u);
 }
 
-TEST(TemporalStatisticsAggregatorTest,
-     MissingLidarDoesNotProduceZeroLidarStats) {
+TEST(TemporalStatisticsAggregatorTest, MissingLidarDoesNotProduceZeroLidarStats) {
   TemporalStatisticsAggregator aggregator;
 
-  auto snapshot = MakeSnapshot(
-      0.0,
-      lidar::LidarScanWindowSource::kAssumedFixedDuration,
-      lidar::LidarScanWindowConfidence::kLow);
+  auto snapshot = MakeSnapshot(0.0, lidar::LidarScanWindowSource::kAssumedFixedDuration, lidar::LidarScanWindowConfidence::kLow);
 
   bool disabled_lidar = false;
   for (auto& stream : snapshot.streams) {

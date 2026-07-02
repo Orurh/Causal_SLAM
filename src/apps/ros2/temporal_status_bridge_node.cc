@@ -30,69 +30,43 @@ std::string BoolToString(bool value) {
 
 class TemporalStatusBridgeNode final : public rclcpp::Node {
  public:
-  explicit TemporalStatusBridgeNode(
-      const rclcpp::NodeOptions& options = rclcpp::NodeOptions{})
+  explicit TemporalStatusBridgeNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions{})
       : rclcpp::Node("temporal_status_bridge_node", options) {
     const std::string map_update_allowed_topic =
-        this->declare_parameter<std::string>(
-            "map_update_allowed_topic", "/causal_slam/map_update_allowed");
-    const std::string temporal_health_topic =
-        this->declare_parameter<std::string>(
-            "temporal_health_topic", "/causal_slam/temporal_health");
+        this->declare_parameter<std::string>("map_update_allowed_topic", "/causal_slam/map_update_allowed");
+    const std::string temporal_health_topic = this->declare_parameter<std::string>("temporal_health_topic", "/causal_slam/temporal_health");
     const std::string map_update_reason_topic =
-        this->declare_parameter<std::string>(
-            "map_update_reason_topic", "/causal_slam/map_update_reason");
-    const std::string fault_reasons_topic =
-        this->declare_parameter<std::string>(
-            "fault_reasons_topic", "/causal_slam/fault_reasons");
+        this->declare_parameter<std::string>("map_update_reason_topic", "/causal_slam/map_update_reason");
+    const std::string fault_reasons_topic = this->declare_parameter<std::string>("fault_reasons_topic", "/causal_slam/fault_reasons");
     const std::string decision_json_topic =
-        this->declare_parameter<std::string>(
-            "map_update_decision_json_topic",
-            "/causal_slam/map_update_decision_json");
-    const std::string diagnostics_topic =
-        this->declare_parameter<std::string>("diagnostics_topic",
-                                             "/diagnostics");
+        this->declare_parameter<std::string>("map_update_decision_json_topic", "/causal_slam/map_update_decision_json");
+    const std::string diagnostics_topic = this->declare_parameter<std::string>("diagnostics_topic", "/diagnostics");
 
-    diagnostics_publisher_ =
-        this->create_publisher<diagnostic_msgs::msg::DiagnosticArray>(
-            diagnostics_topic, rclcpp::SystemDefaultsQoS{});
+    diagnostics_publisher_ = this->create_publisher<diagnostic_msgs::msg::DiagnosticArray>(diagnostics_topic, rclcpp::SystemDefaultsQoS{});
 
-    allowed_subscription_ =
-        this->create_subscription<std_msgs::msg::Bool>(
-            map_update_allowed_topic, rclcpp::SystemDefaultsQoS{},
-            [this](std_msgs::msg::Bool::ConstSharedPtr msg) {
-              latest_allowed_ = msg->data;
-              has_allowed_ = true;
-            });
+    allowed_subscription_ = this->create_subscription<std_msgs::msg::Bool>(map_update_allowed_topic, rclcpp::SystemDefaultsQoS{},
+                                                                           [this](std_msgs::msg::Bool::ConstSharedPtr msg) {
+                                                                             latest_allowed_ = msg->data;
+                                                                             has_allowed_ = true;
+                                                                           });
 
-    health_subscription_ =
-        this->create_subscription<std_msgs::msg::String>(
-            temporal_health_topic, rclcpp::SystemDefaultsQoS{},
-            [this](std_msgs::msg::String::ConstSharedPtr msg) {
-              latest_health_ = msg->data;
-              has_health_ = true;
-            });
+    health_subscription_ = this->create_subscription<std_msgs::msg::String>(temporal_health_topic, rclcpp::SystemDefaultsQoS{},
+                                                                            [this](std_msgs::msg::String::ConstSharedPtr msg) {
+                                                                              latest_health_ = msg->data;
+                                                                              has_health_ = true;
+                                                                            });
 
     reason_subscription_ =
-        this->create_subscription<std_msgs::msg::String>(
-            map_update_reason_topic, rclcpp::SystemDefaultsQoS{},
-            [this](std_msgs::msg::String::ConstSharedPtr msg) {
-              latest_reason_ = msg->data;
-            });
+        this->create_subscription<std_msgs::msg::String>(map_update_reason_topic, rclcpp::SystemDefaultsQoS{},
+                                                         [this](std_msgs::msg::String::ConstSharedPtr msg) { latest_reason_ = msg->data; });
 
-    fault_reasons_subscription_ =
-        this->create_subscription<std_msgs::msg::String>(
-            fault_reasons_topic, rclcpp::SystemDefaultsQoS{},
-            [this](std_msgs::msg::String::ConstSharedPtr msg) {
-              latest_fault_reasons_ = msg->data;
-            });
+    fault_reasons_subscription_ = this->create_subscription<std_msgs::msg::String>(
+        fault_reasons_topic, rclcpp::SystemDefaultsQoS{},
+        [this](std_msgs::msg::String::ConstSharedPtr msg) { latest_fault_reasons_ = msg->data; });
 
-    decision_json_subscription_ =
-        this->create_subscription<std_msgs::msg::String>(
-            decision_json_topic, rclcpp::SystemDefaultsQoS{},
-            [this](std_msgs::msg::String::ConstSharedPtr msg) {
-              latest_decision_json_ = msg->data;
-            });
+    decision_json_subscription_ = this->create_subscription<std_msgs::msg::String>(
+        decision_json_topic, rclcpp::SystemDefaultsQoS{},
+        [this](std_msgs::msg::String::ConstSharedPtr msg) { latest_decision_json_ = msg->data; });
 
     timer_ = this->create_wall_timer(500ms, [this] { PublishDiagnostics(); });
 
@@ -102,10 +76,7 @@ class TemporalStatusBridgeNode final : public rclcpp::Node {
                 " | allowed_topic=%s"
                 " | health_topic=%s"
                 " | fault_reasons_topic=%s",
-                diagnostics_topic.c_str(),
-                map_update_allowed_topic.c_str(),
-                temporal_health_topic.c_str(),
-                fault_reasons_topic.c_str());
+                diagnostics_topic.c_str(), map_update_allowed_topic.c_str(), temporal_health_topic.c_str(), fault_reasons_topic.c_str());
   }
 
  private:
@@ -131,13 +102,11 @@ class TemporalStatusBridgeNode final : public rclcpp::Node {
       status.message = "map_update_blocked";
     }
 
-    status.values.push_back(
-        MakeKeyValue("map_update_allowed", BoolToString(latest_allowed_)));
+    status.values.push_back(MakeKeyValue("map_update_allowed", BoolToString(latest_allowed_)));
     status.values.push_back(MakeKeyValue("temporal_health", latest_health_));
     status.values.push_back(MakeKeyValue("map_update_reason", latest_reason_));
     status.values.push_back(MakeKeyValue("fault_reasons", latest_fault_reasons_));
-    status.values.push_back(
-        MakeKeyValue("has_decision_json", BoolToString(!latest_decision_json_.empty())));
+    status.values.push_back(MakeKeyValue("has_decision_json", BoolToString(!latest_decision_json_.empty())));
 
     array.status.push_back(std::move(status));
     diagnostics_publisher_->publish(array);
@@ -148,8 +117,7 @@ class TemporalStatusBridgeNode final : public rclcpp::Node {
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr reason_subscription_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr fault_reasons_subscription_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr decision_json_subscription_;
-  rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr
-      diagnostics_publisher_;
+  rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diagnostics_publisher_;
   rclcpp::TimerBase::SharedPtr timer_;
 
   bool has_allowed_{false};

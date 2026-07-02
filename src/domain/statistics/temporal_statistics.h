@@ -5,8 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "domain/telemetry/temporal_health.h"
 #include "domain/model/temporal_observation.h"
+#include "domain/telemetry/temporal_health.h"
 
 namespace causal_slam::statistics {
 
@@ -63,8 +63,7 @@ struct CloudDecisionEvent {
   std::uint64_t point_count{0};
   std::uint64_t data_size_bytes{0};
 
-  causal_slam::telemetry::TemporalHealthStatus health{
-      causal_slam::telemetry::TemporalHealthStatus::kOk};
+  causal_slam::telemetry::TemporalHealthStatus health{causal_slam::telemetry::TemporalHealthStatus::kOk};
 
   bool map_update_allowed{true};
   CloudForwardingDecision decision{CloudForwardingDecision::kForwarded};
@@ -95,8 +94,7 @@ struct CloudDecisionStatistics {
 };
 
 struct StreamTimingStatistics {
-  causal_slam::telemetry::TemporalStreamId id{
-      causal_slam::telemetry::TemporalStreamId::kUnknown};
+  causal_slam::telemetry::TemporalStreamId id{causal_slam::telemetry::TemporalStreamId::kUnknown};
 
   NumericStats delay_ms;
   NumericStats period_ms;
@@ -138,10 +136,8 @@ class TemporalStatisticsAggregator final {
  public:
   explicit TemporalStatisticsAggregator(TemporalStatisticsAggregatorConfig config = TemporalStatisticsAggregatorConfig{});
 
-  void Observe(
-      std::int64_t observed_at_ns,
-      const causal_slam::model::TemporalObservation& observation,
-      causal_slam::telemetry::TemporalHealthStatus overall_status);
+  void Observe(std::int64_t observed_at_ns, const causal_slam::model::TemporalObservation& observation,
+               causal_slam::telemetry::TemporalHealthStatus overall_status);
 
   void ObserveCloudDecision(const CloudDecisionEvent& event);
 
@@ -150,8 +146,7 @@ class TemporalStatisticsAggregator final {
  private:
   struct Sample {
     std::int64_t observed_at_ns{0};
-    causal_slam::telemetry::TemporalHealthStatus overall_status{
-        causal_slam::telemetry::TemporalHealthStatus::kOk};
+    causal_slam::telemetry::TemporalHealthStatus overall_status{causal_slam::telemetry::TemporalHealthStatus::kOk};
     causal_slam::model::TemporalObservation observation;
   };
 

@@ -34,8 +34,7 @@ TEST(TransformAgeAnalyzerTest, FreshTransformIsOk) {
   const TransformAgeAnalyzer analyzer{config};
   const auto summary = analyzer.Analyze(MakeBaseObservation());
 
-  EXPECT_EQ(summary.health,
-            causal_slam::telemetry::TemporalHealthStatus::kOk);
+  EXPECT_EQ(summary.health, causal_slam::telemetry::TemporalHealthStatus::kOk);
   EXPECT_EQ(summary.status, TransformLookupStatus::kOk);
   EXPECT_EQ(summary.reason, "ok");
   EXPECT_DOUBLE_EQ(summary.transform_age_ms, 10.0);
@@ -51,8 +50,7 @@ TEST(TransformAgeAnalyzerTest, FailedLookupIsInvalidByDefault) {
 
   const auto summary = analyzer.Analyze(observation);
 
-  EXPECT_EQ(summary.health,
-            causal_slam::telemetry::TemporalHealthStatus::kInvalid);
+  EXPECT_EQ(summary.health, causal_slam::telemetry::TemporalHealthStatus::kInvalid);
   EXPECT_EQ(summary.status, TransformLookupStatus::kLookupFailed);
   EXPECT_EQ(summary.reason, "tf_lookup_failed");
   EXPECT_EQ(summary.adapter_detail, "frame_not_found");
@@ -67,8 +65,7 @@ TEST(TransformAgeAnalyzerTest, ExtrapolationIsDegradedByDefault) {
 
   const auto summary = analyzer.Analyze(observation);
 
-  EXPECT_EQ(summary.health,
-            causal_slam::telemetry::TemporalHealthStatus::kDegraded);
+  EXPECT_EQ(summary.health, causal_slam::telemetry::TemporalHealthStatus::kDegraded);
   EXPECT_EQ(summary.status, TransformLookupStatus::kExtrapolationRequired);
   EXPECT_EQ(summary.reason, "tf_extrapolation_required");
   EXPECT_EQ(summary.adapter_detail, "extrapolation_into_future");
@@ -85,8 +82,7 @@ TEST(TransformAgeAnalyzerTest, StaleTransformIsDegradedByDefault) {
 
   const auto summary = analyzer.Analyze(observation);
 
-  EXPECT_EQ(summary.health,
-            causal_slam::telemetry::TemporalHealthStatus::kDegraded);
+  EXPECT_EQ(summary.health, causal_slam::telemetry::TemporalHealthStatus::kDegraded);
   EXPECT_EQ(summary.status, TransformLookupStatus::kTransformAgeTooHigh);
   EXPECT_EQ(summary.reason, "tf_age_too_high");
   EXPECT_DOUBLE_EQ(summary.transform_age_ms, 100.0);
@@ -104,8 +100,7 @@ TEST(TransformAgeAnalyzerTest, FutureTransformBeyondToleranceIsDegraded) {
 
   const auto summary = analyzer.Analyze(observation);
 
-  EXPECT_EQ(summary.health,
-            causal_slam::telemetry::TemporalHealthStatus::kDegraded);
+  EXPECT_EQ(summary.health, causal_slam::telemetry::TemporalHealthStatus::kDegraded);
   EXPECT_EQ(summary.status, TransformLookupStatus::kTransformFromFuture);
   EXPECT_EQ(summary.reason, "tf_transform_from_future");
   EXPECT_DOUBLE_EQ(summary.transform_age_ms, -5.0);

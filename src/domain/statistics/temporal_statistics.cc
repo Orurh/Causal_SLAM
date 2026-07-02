@@ -10,8 +10,7 @@ namespace causal_slam::statistics {
 namespace {
 
 struct StreamTimingAccumulator {
-  causal_slam::telemetry::TemporalStreamId id{
-      causal_slam::telemetry::TemporalStreamId::kUnknown};
+  causal_slam::telemetry::TemporalStreamId id{causal_slam::telemetry::TemporalStreamId::kUnknown};
 
   std::vector<double> delay_ms;
   std::vector<double> period_ms;
@@ -108,13 +107,9 @@ void AddScanWindowConfidenceSample(causal_slam::lidar::LidarScanWindowConfidence
   }
 }
 
-StreamTimingAccumulator& FindOrAppendStreamAccumulator(
-    std::vector<StreamTimingAccumulator>* accumulators,
-    causal_slam::telemetry::TemporalStreamId id) {
-  auto it = std::find_if(
-      accumulators->begin(), accumulators->end(), [id](const auto& item) {
-        return item.id == id;
-      });
+StreamTimingAccumulator& FindOrAppendStreamAccumulator(std::vector<StreamTimingAccumulator>* accumulators,
+                                                       causal_slam::telemetry::TemporalStreamId id) {
+  auto it = std::find_if(accumulators->begin(), accumulators->end(), [id](const auto& item) { return item.id == id; });
 
   if (it != accumulators->end()) {
     return *it;
@@ -139,14 +134,10 @@ StreamTimingStatistics BuildStreamTimingStatistics(StreamTimingAccumulator accum
   };
 }
 
-void IncrementBlockReason(
-    const std::string& reason,
-    std::vector<CloudBlockReasonCount>* counts) {
+void IncrementBlockReason(const std::string& reason, std::vector<CloudBlockReasonCount>* counts) {
   const std::string key = reason.empty() ? "unknown" : reason;
 
-  auto it = std::find_if(counts->begin(), counts->end(), [&](const auto& item) {
-    return item.reason == key;
-  });
+  auto it = std::find_if(counts->begin(), counts->end(), [&](const auto& item) { return item.reason == key; });
 
   if (it != counts->end()) {
     ++it->count;
@@ -176,10 +167,8 @@ const char* ToString(CloudForwardingDecision decision) {
 
 TemporalStatisticsAggregator::TemporalStatisticsAggregator(TemporalStatisticsAggregatorConfig config) : config_(config) {}
 
-void TemporalStatisticsAggregator::Observe(
-    std::int64_t observed_at_ns,
-    const causal_slam::model::TemporalObservation& observation,
-    causal_slam::telemetry::TemporalHealthStatus overall_status) {
+void TemporalStatisticsAggregator::Observe(std::int64_t observed_at_ns, const causal_slam::model::TemporalObservation& observation,
+                                           causal_slam::telemetry::TemporalHealthStatus overall_status) {
   Sample sample{
       .observed_at_ns = observed_at_ns,
       .overall_status = overall_status,
@@ -192,8 +181,7 @@ void TemporalStatisticsAggregator::Observe(
   PruneRollingSamples(observed_at_ns);
 }
 
-void TemporalStatisticsAggregator::ObserveCloudDecision(
-    const CloudDecisionEvent& event) {
+void TemporalStatisticsAggregator::ObserveCloudDecision(const CloudDecisionEvent& event) {
   ++cloud_decision_total_count_;
 
   switch (event.decision) {
@@ -213,8 +201,7 @@ void TemporalStatisticsAggregator::ObserveCloudDecision(
   IncrementBlockReason(event.reason, &cloud_block_reasons_);
   recent_blocked_cloud_events_.push_back(event);
 
-  const std::uint64_t limit =
-      std::max<std::uint64_t>(config_.max_recent_blocked_cloud_events, 1);
+  const std::uint64_t limit = std::max<std::uint64_t>(config_.max_recent_blocked_cloud_events, 1);
 
   while (recent_blocked_cloud_events_.size() > limit) {
     recent_blocked_cloud_events_.pop_front();
@@ -275,10 +262,8 @@ TemporalWindowStatistics TemporalStatisticsAggregator::BuildWindowStatistics(con
     AddHealthSample(sample.overall_status, &stats.health);
 
     if (sample.observation.lidar_scan_window.has_value()) {
-      AddScanWindowSourceSample(sample.observation.lidar_scan_window->source,
-                                &stats.scan_window_sources);
-      AddScanWindowConfidenceSample(sample.observation.lidar_scan_window->confidence,
-                                    &stats.scan_window_confidence);
+      AddScanWindowSourceSample(sample.observation.lidar_scan_window->source, &stats.scan_window_sources);
+      AddScanWindowConfidenceSample(sample.observation.lidar_scan_window->confidence, &stats.scan_window_confidence);
     }
 
     for (const auto& stream : sample.observation.streams) {
@@ -288,8 +273,7 @@ TemporalWindowStatistics TemporalStatisticsAggregator::BuildWindowStatistics(con
         continue;
       }
 
-      auto& accumulator =
-          FindOrAppendStreamAccumulator(&stream_accumulators, stream.id);
+      auto& accumulator = FindOrAppendStreamAccumulator(&stream_accumulators, stream.id);
       accumulator.delay_ms.push_back(timing.last_delay_ms);
       accumulator.period_ms.push_back(timing.last_period_ms);
       accumulator.jitter_ms.push_back(timing.last_jitter_ms);
@@ -297,8 +281,7 @@ TemporalWindowStatistics TemporalStatisticsAggregator::BuildWindowStatistics(con
 
     if (sample.observation.imu_coverage.has_value()) {
       imu_coverage_ratio.push_back(sample.observation.imu_coverage->coverage_ratio);
-      imu_samples_in_window.push_back(
-          static_cast<double>(sample.observation.imu_coverage->imu_count_in_window));
+      imu_samples_in_window.push_back(static_cast<double>(sample.observation.imu_coverage->imu_count_in_window));
       imu_max_gap_inside_ms.push_back(sample.observation.imu_coverage->max_gap_inside_ms);
     }
   }
@@ -318,30 +301,23 @@ TemporalWindowStatistics TemporalStatisticsAggregator::BuildWindowStatistics(con
 }  // namespace causal_slam::statistics
 namespace causal_slam::statistics {
 
-CloudDecisionStatistics
-TemporalStatisticsAggregator::BuildCloudDecisionStatistics() const {
+CloudDecisionStatistics TemporalStatisticsAggregator::BuildCloudDecisionStatistics() const {
   CloudDecisionStatistics stats;
   stats.total_count = cloud_decision_total_count_;
   stats.forwarded_count = cloud_decision_forwarded_count_;
   stats.blocked_warmup_count = cloud_decision_blocked_warmup_count_;
   stats.blocked_by_gate_count = cloud_decision_blocked_by_gate_count_;
-  stats.blocked_count =
-      stats.blocked_warmup_count + stats.blocked_by_gate_count;
+  stats.blocked_count = stats.blocked_warmup_count + stats.blocked_by_gate_count;
 
   stats.block_reasons = cloud_block_reasons_;
-  std::sort(
-      stats.block_reasons.begin(),
-      stats.block_reasons.end(),
-      [](const auto& lhs, const auto& rhs) {
-        if (lhs.count != rhs.count) {
-          return lhs.count > rhs.count;
-        }
-        return lhs.reason < rhs.reason;
-      });
+  std::sort(stats.block_reasons.begin(), stats.block_reasons.end(), [](const auto& lhs, const auto& rhs) {
+    if (lhs.count != rhs.count) {
+      return lhs.count > rhs.count;
+    }
+    return lhs.reason < rhs.reason;
+  });
 
-  stats.recent_blocked_events.assign(
-      recent_blocked_cloud_events_.begin(),
-      recent_blocked_cloud_events_.end());
+  stats.recent_blocked_events.assign(recent_blocked_cloud_events_.begin(), recent_blocked_cloud_events_.end());
 
   return stats;
 }

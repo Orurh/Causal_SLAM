@@ -21,8 +21,7 @@ diagnostics::TemporalDiagnosticSnapshot MakeSnapshot() {
 }
 
 causal_slam::policy::MapUpdateDecision MakeDecision() {
-  return causal_slam::policy::DecideMapUpdate(
-      causal_slam::telemetry::TemporalHealthStatus::kOk);
+  return causal_slam::policy::DecideMapUpdate(causal_slam::telemetry::TemporalHealthStatus::kOk);
 }
 
 TEST(ConsoleTemporalSummaryRendererTest, RendersNoTfChecksWhenEmpty) {

@@ -43,12 +43,10 @@ class ImuCoverageAnalyzer final {
  public:
   explicit ImuCoverageAnalyzer(ImuCoverageConfig config = ImuCoverageConfig{});
 
-  void SetConfig(ImuCoverageConfig config);
+  void SetConfig(const ImuCoverageConfig& config);
 
   template <typename ImuSamplesRange>
-  [[nodiscard]] ImuCoverageSummary Analyze(
-      causal_slam::core::TimeWindow scan_window,
-      const ImuSamplesRange& imu_samples) const {
+  [[nodiscard]] ImuCoverageSummary Analyze(causal_slam::core::TimeWindow scan_window, const ImuSamplesRange& imu_samples) const {
     std::vector<std::int64_t> stamps;
     stamps.reserve(imu_samples.size());
 
@@ -62,9 +60,7 @@ class ImuCoverageAnalyzer final {
   }
 
  private:
-  [[nodiscard]] ImuCoverageSummary AnalyzeStamps(
-      causal_slam::core::TimeWindow scan_window,
-      std::vector<std::int64_t> stamps) const;
+  [[nodiscard]] ImuCoverageSummary AnalyzeStamps(causal_slam::core::TimeWindow scan_window, std::vector<std::int64_t> stamps) const;
 
   ImuCoverageConfig config_;
 };

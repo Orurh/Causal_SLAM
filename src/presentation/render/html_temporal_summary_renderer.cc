@@ -4,9 +4,9 @@
 #include <string>
 #include <string_view>
 
+#include "domain/policy/map_update_decision.h"
 #include "presentation/report/report_document.h"
 #include "presentation/report/temporal_report_builder.h"
-#include "domain/policy/map_update_decision.h"
 
 namespace causal_slam::render {
 namespace {
@@ -69,18 +69,14 @@ std::string CssClassForStatus(std::string_view status) {
   return "status-neutral";
 }
 
-void RenderMetric(
-    std::ostringstream& out,
-    const causal_slam::report::ReportMetric& metric) {
+void RenderMetric(std::ostringstream& out, const causal_slam::report::ReportMetric& metric) {
   out << "<div class=\"metric\">"
       << "<span class=\"metric-name\">" << EscapeHtml(metric.name) << "</span>"
       << "<span class=\"metric-value\">" << EscapeHtml(metric.value) << "</span>"
       << "</div>\n";
 }
 
-void RenderRow(
-    std::ostringstream& out,
-    const causal_slam::report::ReportRow& row) {
+void RenderRow(std::ostringstream& out, const causal_slam::report::ReportRow& row) {
   if (row.collapsed) {
     out << "<details class=\"row row-collapsed\">\n"
         << "  <summary class=\"row-head\">\n";
@@ -89,12 +85,10 @@ void RenderRow(
         << "  <div class=\"row-head\">\n";
   }
 
-  out << "    <span class=\"row-label\">" << EscapeHtml(row.label)
-      << "</span>\n";
+  out << "    <span class=\"row-label\">" << EscapeHtml(row.label) << "</span>\n";
 
   if (!row.status.empty()) {
-    out << "    <span class=\"badge " << CssClassForStatus(row.status)
-        << "\">" << EscapeHtml(row.status) << "</span>\n";
+    out << "    <span class=\"badge " << CssClassForStatus(row.status) << "\">" << EscapeHtml(row.status) << "</span>\n";
   }
 
   if (row.collapsed) {
@@ -112,28 +106,23 @@ void RenderRow(
   }
 
   if (!row.reason.empty()) {
-    out << "  <div class=\"row-line\"><span>reason</span><code>"
-        << EscapeHtml(row.reason) << "</code></div>\n";
+    out << "  <div class=\"row-line\"><span>reason</span><code>" << EscapeHtml(row.reason) << "</code></div>\n";
   }
 
   if (!row.detail.empty()) {
-    out << "  <div class=\"row-line\"><span>detail</span><code>"
-        << EscapeHtml(row.detail) << "</code></div>\n";
+    out << "  <div class=\"row-line\"><span>detail</span><code>" << EscapeHtml(row.detail) << "</code></div>\n";
   }
 
   if (!row.explanation.empty()) {
-    out << "  <p class=\"row-text\"><strong>Why:</strong> "
-        << EscapeHtml(row.explanation) << "</p>\n";
+    out << "  <p class=\"row-text\"><strong>Why:</strong> " << EscapeHtml(row.explanation) << "</p>\n";
   }
 
   if (!row.evidence.empty()) {
-    out << "  <p class=\"row-text\"><strong>Evidence:</strong> "
-        << EscapeHtml(row.evidence) << "</p>\n";
+    out << "  <p class=\"row-text\"><strong>Evidence:</strong> " << EscapeHtml(row.evidence) << "</p>\n";
   }
 
   if (!row.suggested_action.empty()) {
-    out << "  <p class=\"row-text\"><strong>Action:</strong> "
-        << EscapeHtml(row.suggested_action) << "</p>\n";
+    out << "  <p class=\"row-text\"><strong>Action:</strong> " << EscapeHtml(row.suggested_action) << "</p>\n";
   }
 
   if (row.collapsed) {
@@ -143,15 +132,12 @@ void RenderRow(
   }
 }
 
-void RenderSection(
-    std::ostringstream& out,
-    const causal_slam::report::ReportSection& section) {
+void RenderSection(std::ostringstream& out, const causal_slam::report::ReportSection& section) {
   out << "<section class=\"card\" id=\"" << EscapeHtml(section.id) << "\">\n"
       << "  <h2>" << EscapeHtml(section.title) << "</h2>\n";
 
   if (section.metrics.empty() && section.rows.empty()) {
-    out << "  <p class=\"empty\">" << EscapeHtml(section.empty_message)
-        << "</p>\n"
+    out << "  <p class=\"empty\">" << EscapeHtml(section.empty_message) << "</p>\n"
         << "</section>\n";
     return;
   }
@@ -175,8 +161,7 @@ void RenderSection(
   out << "</section>\n";
 }
 
-std::string RenderDocumentBody(
-    const causal_slam::report::ReportDocument& document) {
+std::string RenderDocumentBody(const causal_slam::report::ReportDocument& document) {
   std::ostringstream out;
 
   if (!document.title.empty()) {
@@ -339,24 +324,20 @@ code {
 
 }  // namespace
 
-std::string HtmlTemporalSummaryRenderer::RenderDiagnostics(
-    const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot,
-    const causal_slam::policy::MapUpdateDecision& map_update_decision) const {
+std::string HtmlTemporalSummaryRenderer::RenderDiagnostics(const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot,
+                                                           const causal_slam::policy::MapUpdateDecision& map_update_decision) const {
   const causal_slam::report::TemporalReportBuilder builder;
-  return RenderDocumentBody(
-      builder.BuildDiagnosticsReport(snapshot, map_update_decision));
+  return RenderDocumentBody(builder.BuildDiagnosticsReport(snapshot, map_update_decision));
 }
 
-std::string HtmlTemporalSummaryRenderer::RenderStatistics(
-    const causal_slam::statistics::TemporalStatisticsSnapshot& snapshot) const {
+std::string HtmlTemporalSummaryRenderer::RenderStatistics(const causal_slam::statistics::TemporalStatisticsSnapshot& snapshot) const {
   const causal_slam::report::TemporalReportBuilder builder;
   return RenderDocumentBody(builder.BuildStatisticsReport(snapshot));
 }
 
-std::string HtmlTemporalSummaryRenderer::RenderPage(
-    const causal_slam::diagnostics::TemporalDiagnosticSnapshot& diagnostics,
-    const causal_slam::policy::MapUpdateDecision& map_update_decision,
-    const causal_slam::statistics::TemporalStatisticsSnapshot& statistics) const {
+std::string HtmlTemporalSummaryRenderer::RenderPage(const causal_slam::diagnostics::TemporalDiagnosticSnapshot& diagnostics,
+                                                    const causal_slam::policy::MapUpdateDecision& map_update_decision,
+                                                    const causal_slam::statistics::TemporalStatisticsSnapshot& statistics) const {
   std::ostringstream out;
 
   out << "<!doctype html>\n"
@@ -365,15 +346,14 @@ std::string HtmlTemporalSummaryRenderer::RenderPage(
       << "  <meta charset=\"utf-8\">\n"
       << "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
       << "  <title>Causal-SLAM Temporal Report</title>\n"
-      << "  <style>\n" << PageCss() << "  </style>\n"
+      << "  <style>\n"
+      << PageCss() << "  </style>\n"
       << "</head>\n"
       << "<body>\n"
       << "<main>\n"
       << "<h1>Causal-SLAM Temporal Report</h1>\n"
       << "<div class=\"grid\">\n"
-      << RenderDiagnostics(diagnostics, map_update_decision)
-      << RenderStatistics(statistics)
-      << "</div>\n"
+      << RenderDiagnostics(diagnostics, map_update_decision) << RenderStatistics(statistics) << "</div>\n"
       << "</main>\n"
       << "</body>\n"
       << "</html>\n";

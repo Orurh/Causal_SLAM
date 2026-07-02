@@ -18,9 +18,7 @@ ImuSample ImuAtMs(const std::int64_t timestamp_ms) {
   };
 }
 
-causal_slam::core::TimeWindow WindowMs(
-    const std::int64_t start_ms,
-    const std::int64_t end_ms) {
+causal_slam::core::TimeWindow WindowMs(const std::int64_t start_ms, const std::int64_t end_ms) {
   return causal_slam::core::TimeWindow{
       .start_ns = Ms(start_ms),
       .end_ns = Ms(end_ms),
@@ -35,12 +33,7 @@ TEST(ImuCoverageAnalyzerTest, FullCoverageIsOk) {
   }};
 
   const std::vector<ImuSample> samples{
-      ImuAtMs(1000),
-      ImuAtMs(1020),
-      ImuAtMs(1040),
-      ImuAtMs(1060),
-      ImuAtMs(1080),
-      ImuAtMs(1100),
+      ImuAtMs(1000), ImuAtMs(1020), ImuAtMs(1040), ImuAtMs(1060), ImuAtMs(1080), ImuAtMs(1100),
   };
 
   const ImuCoverageSummary summary = analyzer.Analyze(WindowMs(1000, 1100), samples);
@@ -58,11 +51,7 @@ TEST(ImuCoverageAnalyzerTest, MissingPrefixDegradesCoverage) {
   const ImuCoverageAnalyzer analyzer{};
 
   const std::vector<ImuSample> samples{
-      ImuAtMs(1030),
-      ImuAtMs(1050),
-      ImuAtMs(1070),
-      ImuAtMs(1090),
-      ImuAtMs(1100),
+      ImuAtMs(1030), ImuAtMs(1050), ImuAtMs(1070), ImuAtMs(1090), ImuAtMs(1100),
   };
 
   const ImuCoverageSummary summary = analyzer.Analyze(WindowMs(1000, 1100), samples);
@@ -77,11 +66,7 @@ TEST(ImuCoverageAnalyzerTest, MissingSuffixDegradesCoverage) {
   const ImuCoverageAnalyzer analyzer{};
 
   const std::vector<ImuSample> samples{
-      ImuAtMs(1000),
-      ImuAtMs(1020),
-      ImuAtMs(1040),
-      ImuAtMs(1060),
-      ImuAtMs(1070),
+      ImuAtMs(1000), ImuAtMs(1020), ImuAtMs(1040), ImuAtMs(1060), ImuAtMs(1070),
   };
 
   const ImuCoverageSummary summary = analyzer.Analyze(WindowMs(1000, 1100), samples);

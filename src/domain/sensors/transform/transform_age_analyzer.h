@@ -22,19 +22,14 @@ struct TransformAgeAnalyzerConfig {
   double max_transform_age_ms{50.0};
   double max_future_tolerance_ms{1.0};
 
-  causal_slam::telemetry::TemporalHealthStatus lookup_failed_health{
-      causal_slam::telemetry::TemporalHealthStatus::kInvalid};
-  causal_slam::telemetry::TemporalHealthStatus extrapolation_health{
-      causal_slam::telemetry::TemporalHealthStatus::kDegraded};
-  causal_slam::telemetry::TemporalHealthStatus stale_transform_health{
-      causal_slam::telemetry::TemporalHealthStatus::kDegraded};
-  causal_slam::telemetry::TemporalHealthStatus future_transform_health{
-      causal_slam::telemetry::TemporalHealthStatus::kDegraded};
+  causal_slam::telemetry::TemporalHealthStatus lookup_failed_health{causal_slam::telemetry::TemporalHealthStatus::kInvalid};
+  causal_slam::telemetry::TemporalHealthStatus extrapolation_health{causal_slam::telemetry::TemporalHealthStatus::kDegraded};
+  causal_slam::telemetry::TemporalHealthStatus stale_transform_health{causal_slam::telemetry::TemporalHealthStatus::kDegraded};
+  causal_slam::telemetry::TemporalHealthStatus future_transform_health{causal_slam::telemetry::TemporalHealthStatus::kDegraded};
 };
 
 struct TransformAgeSummary {
-  causal_slam::telemetry::TemporalHealthStatus health{
-      causal_slam::telemetry::TemporalHealthStatus::kOk};
+  causal_slam::telemetry::TemporalHealthStatus health{causal_slam::telemetry::TemporalHealthStatus::kOk};
 
   TransformLookupStatus status{TransformLookupStatus::kOk};
 
@@ -50,11 +45,9 @@ struct TransformAgeSummary {
 
 class TransformAgeAnalyzer final {
  public:
-  explicit TransformAgeAnalyzer(
-      TransformAgeAnalyzerConfig config = TransformAgeAnalyzerConfig{});
+  explicit TransformAgeAnalyzer(TransformAgeAnalyzerConfig config = TransformAgeAnalyzerConfig{});
 
-  [[nodiscard]] TransformAgeSummary Analyze(
-      const TransformLookupObservation& observation) const;
+  [[nodiscard]] TransformAgeSummary Analyze(const TransformLookupObservation& observation) const;
 
  private:
   TransformAgeAnalyzerConfig config_;

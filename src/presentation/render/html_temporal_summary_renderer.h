@@ -1,10 +1,9 @@
-  #pragma once
+#pragma once
 
 #include <string>
 
 #include "domain/diagnostics/temporal_diagnostics.h"
 #include "domain/statistics/temporal_statistics.h"
-
 
 namespace causal_slam::policy {
 struct MapUpdateDecision;

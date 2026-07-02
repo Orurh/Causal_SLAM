@@ -2,7 +2,6 @@
 
 #include "domain/policy/map_update_decision.h"
 
-
 #include <sstream>
 #include <string>
 #include <string_view>

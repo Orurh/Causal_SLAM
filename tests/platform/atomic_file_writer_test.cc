@@ -19,11 +19,9 @@ std::string ReadFile(const std::filesystem::path& path) {
 }
 
 std::filesystem::path MakeTempDir() {
-  const auto suffix =
-      std::chrono::steady_clock::now().time_since_epoch().count();
+  const auto suffix = std::chrono::steady_clock::now().time_since_epoch().count();
 
-  return std::filesystem::temp_directory_path() /
-         ("causal_slam_atomic_writer_test_" + std::to_string(suffix));
+  return std::filesystem::temp_directory_path() / ("causal_slam_atomic_writer_test_" + std::to_string(suffix));
 }
 
 TEST(AtomicFileWriterTest, WritesNewFile) {

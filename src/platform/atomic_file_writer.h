@@ -11,8 +11,6 @@ struct WriteTextFileResult {
   std::string error;
 };
 
-[[nodiscard]] WriteTextFileResult WriteTextFileAtomically(
-    const std::filesystem::path& output_path,
-    std::string_view content);
+[[nodiscard]] WriteTextFileResult WriteTextFileAtomically(const std::filesystem::path& output_path, std::string_view content);
 
 }  // namespace causal_slam::platform

@@ -6,8 +6,7 @@
 namespace causal_slam::platform {
 namespace {
 
-std::filesystem::path MakeTemporaryPath(
-    const std::filesystem::path& output_path) {
+std::filesystem::path MakeTemporaryPath(const std::filesystem::path& output_path) {
   auto temporary_path = output_path;
   temporary_path += ".tmp";
   return temporary_path;
@@ -15,9 +14,7 @@ std::filesystem::path MakeTemporaryPath(
 
 }  // namespace
 
-WriteTextFileResult WriteTextFileAtomically(
-    const std::filesystem::path& output_path,
-    std::string_view content) {
+WriteTextFileResult WriteTextFileAtomically(const std::filesystem::path& output_path, std::string_view content) {
   if (output_path.empty()) {
     return WriteTextFileResult{
         .ok = false,
@@ -33,8 +30,7 @@ WriteTextFileResult WriteTextFileAtomically(
     if (error_code) {
       return WriteTextFileResult{
           .ok = false,
-          .error = "failed_to_create_parent_directory: " +
-                   error_code.message(),
+          .error = "failed_to_create_parent_directory: " + error_code.message(),
       };
     }
   }

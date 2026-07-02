@@ -28,9 +28,7 @@ double MaxGapInsideMilliseconds(const std::vector<std::int64_t>& stamps) {
   return causal_slam::core::NanosecondsToMilliseconds(max_gap_ns);
 }
 
-ImuCoverageSummary EvaluateCoverageHealth(
-    ImuCoverageSummary summary,
-    const ImuCoverageConfig& config) {
+ImuCoverageSummary EvaluateCoverageHealth(ImuCoverageSummary summary, const ImuCoverageConfig& config) {
   if (summary.imu_count_in_window == 0) {
     summary.health = ImuCoverageHealth::kDegraded;
     summary.reason = "imu_window_empty";
@@ -75,16 +73,14 @@ const char* ToString(const ImuCoverageHealth health) {
   return "UNKNOWN";
 }
 
-ImuCoverageAnalyzer::ImuCoverageAnalyzer(ImuCoverageConfig config)
-    : config_(config) {}
+ImuCoverageAnalyzer::ImuCoverageAnalyzer(ImuCoverageConfig config) : config_(config) {}
 
-void ImuCoverageAnalyzer::SetConfig(ImuCoverageConfig config) {
+void ImuCoverageAnalyzer::SetConfig(const ImuCoverageConfig& config) {
   config_ = config;
 }
 
-ImuCoverageSummary ImuCoverageAnalyzer::AnalyzeStamps(
-    const causal_slam::core::TimeWindow scan_window,
-    std::vector<std::int64_t> stamps) const {
+ImuCoverageSummary ImuCoverageAnalyzer::AnalyzeStamps(const causal_slam::core::TimeWindow scan_window,
+                                                      std::vector<std::int64_t> stamps) const {
   if (!scan_window.IsValid() || scan_window.DurationNs() <= 0) {
     return ImuCoverageSummary{
         .health = ImuCoverageHealth::kDegraded,
@@ -94,8 +90,7 @@ ImuCoverageSummary ImuCoverageAnalyzer::AnalyzeStamps(
 
   std::sort(stamps.begin(), stamps.end());
 
-  const double scan_duration_ms =
-      causal_slam::core::NanosecondsToMilliseconds(scan_window.DurationNs());
+  const double scan_duration_ms = causal_slam::core::NanosecondsToMilliseconds(scan_window.DurationNs());
 
   if (stamps.empty()) {
     return ImuCoverageSummary{
@@ -112,18 +107,12 @@ ImuCoverageSummary ImuCoverageAnalyzer::AnalyzeStamps(
   const std::int64_t first_imu_ns = stamps.front();
   const std::int64_t last_imu_ns = stamps.back();
 
-  const double missing_prefix_ms =
-      causal_slam::core::NanosecondsToMilliseconds(
-          first_imu_ns - scan_window.start_ns);
-  const double missing_suffix_ms =
-      causal_slam::core::NanosecondsToMilliseconds(
-          scan_window.end_ns - last_imu_ns);
+  const double missing_prefix_ms = causal_slam::core::NanosecondsToMilliseconds(first_imu_ns - scan_window.start_ns);
+  const double missing_suffix_ms = causal_slam::core::NanosecondsToMilliseconds(scan_window.end_ns - last_imu_ns);
   const double max_gap_inside_ms = MaxGapInsideMilliseconds(stamps);
 
-  const double covered_ms =
-      scan_duration_ms - missing_prefix_ms - missing_suffix_ms;
-  const double coverage_ratio =
-      scan_duration_ms > 0.0 ? ClampRatio(covered_ms / scan_duration_ms) : 0.0;
+  const double covered_ms = scan_duration_ms - missing_prefix_ms - missing_suffix_ms;
+  const double coverage_ratio = scan_duration_ms > 0.0 ? ClampRatio(covered_ms / scan_duration_ms) : 0.0;
 
   auto summary = ImuCoverageSummary{
       .imu_count_in_window = static_cast<std::uint64_t>(stamps.size()),

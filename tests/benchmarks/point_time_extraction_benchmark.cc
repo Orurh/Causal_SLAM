@@ -23,19 +23,15 @@ constexpr std::int64_t kHeaderStampNs = 1'000'000'000LL;
 constexpr std::uint32_t kScanDurationNs = 100'000'000U;
 
 std::vector<std::uint8_t> MakeCloudData(std::uint32_t point_count) {
-  std::vector<std::uint8_t> data(
-      static_cast<std::size_t>(point_count) * kPointStep, 0U);
+  std::vector<std::uint8_t> data(static_cast<std::size_t>(point_count) * kPointStep, 0U);
 
   for (std::uint32_t i = 0; i < point_count; ++i) {
     const std::uint32_t offset_ns =
         point_count <= 1
             ? 0U
-            : static_cast<std::uint32_t>(
-                  (static_cast<std::uint64_t>(i) * kScanDurationNs) /
-                  static_cast<std::uint64_t>(point_count - 1));
+            : static_cast<std::uint32_t>((static_cast<std::uint64_t>(i) * kScanDurationNs) / static_cast<std::uint64_t>(point_count - 1));
 
-    const std::size_t byte_offset =
-        (static_cast<std::size_t>(i) * kPointStep) + kOffsetTimeFieldOffset;
+    const std::size_t byte_offset = (static_cast<std::size_t>(i) * kPointStep) + kOffsetTimeFieldOffset;
 
     std::memcpy(data.data() + byte_offset, &offset_ns, sizeof(offset_ns));
   }
@@ -60,8 +56,7 @@ void RunCase(std::uint32_t point_count, int iterations) {
       .offset = kOffsetTimeFieldOffset,
       .datatype = causal_slam::pointcloud::kPointCloud2Uint32,
       .count = 1,
-      .time_role =
-          causal_slam::pointcloud::PointCloud2TimeFieldRole::kPointOffsetTime,
+      .time_role = causal_slam::pointcloud::PointCloud2TimeFieldRole::kPointOffsetTime,
   };
 
   const causal_slam::pointcloud::PointCloud2TimeFieldExtractor extractor;
@@ -88,35 +83,22 @@ void RunCase(std::uint32_t point_count, int iterations) {
       throw std::runtime_error("unexpected point_count_used");
     }
 
-    const auto elapsed =
-        std::chrono::duration_cast<std::chrono::duration<double, std::micro>>(
-            finished - started);
+    const auto elapsed = std::chrono::duration_cast<std::chrono::duration<double, std::micro>>(finished - started);
 
     durations_us.push_back(elapsed.count());
   }
 
   std::sort(durations_us.begin(), durations_us.end());
 
-  const double total_us = std::accumulate(
-      durations_us.begin(), durations_us.end(), 0.0);
+  const double total_us = std::accumulate(durations_us.begin(), durations_us.end(), 0.0);
   const double avg_us = total_us / static_cast<double>(durations_us.size());
   const double p50_us = durations_us[durations_us.size() / 2];
-  const double p95_us =
-      durations_us[static_cast<std::size_t>(
-          static_cast<double>(durations_us.size() - 1) * 0.95)];
+  const double p95_us = durations_us[static_cast<std::size_t>(static_cast<double>(durations_us.size() - 1) * 0.95)];
   const double max_us = durations_us.back();
 
-  std::cout << std::fixed << std::setprecision(2)
-            << "point_count=" << point_count
-            << " iterations=" << iterations
-            << " avg_us=" << avg_us
-            << " p50_us=" << p50_us
-            << " p95_us=" << p95_us
-            << " max_us=" << max_us
-            << " avg_ms=" << avg_us / 1000.0
-            << '\n';
+  std::cout << std::fixed << std::setprecision(2) << "point_count=" << point_count << " iterations=" << iterations << " avg_us=" << avg_us
+            << " p50_us=" << p50_us << " p95_us=" << p95_us << " max_us=" << max_us << " avg_ms=" << avg_us / 1000.0 << '\n';
 }
-
 
 bool StressBenchmarkEnabled() {
   const char* value = std::getenv("CAUSAL_SLAM_BENCHMARK_STRESS");

@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 PACKAGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WS_DIR="$(cd "${PACKAGE_DIR}/../.." && pwd)"
+WS_DIR="${PACKAGE_DIR}"
 
 set +u
 source /opt/ros/jazzy/setup.bash
@@ -22,6 +22,16 @@ PUBLISHER_ONLY="${CAUSAL_SLAM_RUNTIME_STRESS_PUBLISHER_ONLY:-0}"
 QOS_RELIABILITY="${CAUSAL_SLAM_RUNTIME_STRESS_QOS_RELIABILITY:-best_effort}"
 QOS_DEPTH="${CAUSAL_SLAM_RUNTIME_STRESS_QOS_DEPTH:-5}"
 
+MIN_INPUT_HZ="${CAUSAL_SLAM_RUNTIME_STRESS_MIN_INPUT_HZ:-9.0}"
+MIN_CHECKED_HZ="${CAUSAL_SLAM_RUNTIME_STRESS_MIN_CHECKED_HZ:-9.0}"
+FAIL_ON_MONITOR_WARNINGS="${CAUSAL_SLAM_RUNTIME_STRESS_FAIL_ON_MONITOR_WARNINGS:-1}"
+MONITOR_BAD_RE="${CAUSAL_SLAM_RUNTIME_STRESS_MONITOR_BAD_RE:-WARN|ERROR|blocked|dropped}"
+
+LIDAR_HOLDBACK_ENABLED="${CAUSAL_SLAM_RUNTIME_STRESS_LIDAR_HOLDBACK_ENABLED:-true}"
+LIDAR_HOLDBACK_TOLERANCE_MS="${CAUSAL_SLAM_RUNTIME_STRESS_LIDAR_HOLDBACK_TOLERANCE_MS:-10.0}"
+LIDAR_HOLDBACK_MAX_PENDING="${CAUSAL_SLAM_RUNTIME_STRESS_LIDAR_HOLDBACK_MAX_PENDING:-32}"
+IMU_BUFFER_RETENTION_MS="${CAUSAL_SLAM_RUNTIME_STRESS_IMU_BUFFER_RETENTION_MS:-5000.0}"
+
 INPUT_NS="/causal_slam_runtime_stress/${RUN_ID}/input"
 OUTPUT_NS="/causal_slam_runtime_stress/${RUN_ID}/output"
 
@@ -33,6 +43,13 @@ HEALTH_TOPIC="${OUTPUT_NS}/temporal_health"
 REASON_TOPIC="${OUTPUT_NS}/map_update_reason"
 FAULT_REASONS_TOPIC="${OUTPUT_NS}/fault_reasons"
 DECISION_JSON_TOPIC="${OUTPUT_NS}/map_update_decision_json"
+
+MONITOR_LOG="${LOG_DIR}/${RUN_ID}_monitor.log"
+IMU_LOG="${LOG_DIR}/${RUN_ID}_imu.log"
+LIDAR_LOG="${LOG_DIR}/${RUN_ID}_lidar.log"
+INPUT_HZ_LOG="${LOG_DIR}/${RUN_ID}_input_hz.log"
+OUTPUT_HZ_LOG="${LOG_DIR}/${RUN_ID}_output_hz.log"
+DECISION_JSON_LOG="${LOG_DIR}/${RUN_ID}_decision_json.log"
 
 PIDS=()
 
@@ -56,6 +73,13 @@ cleanup() {
 
 trap cleanup EXIT
 
+truthy() {
+  case "$1" in
+    1|true|TRUE|yes|YES|on|ON) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 start_process() {
   local name="$1"
   shift
@@ -67,11 +91,46 @@ start_process() {
   PIDS+=("$!")
 }
 
-truthy() {
-  case "$1" in
-    1|true|TRUE|yes|YES|on|ON) return 0 ;;
-    *) return 1 ;;
-  esac
+start_logged_timeout_process() {
+  local name="$1"
+  local log_file="$2"
+  shift 2
+
+  echo "starting ${name}, log=${log_file}"
+
+  setsid timeout "${DURATION_SEC}s" "$@" >"${log_file}" 2>&1 &
+  local pid="$!"
+  PIDS+=("${pid}")
+
+  echo "${pid}"
+}
+
+extract_last_total_hz() {
+  local log_file="$1"
+  local label="$2"
+
+  grep "PointCloudRateProbe | label=${label}" "${log_file}" \
+    | tail -1 \
+    | sed -n 's/.*total_hz=\([0-9.]*\).*/\1/p'
+}
+
+check_float_gte() {
+  local actual="$1"
+  local minimum="$2"
+  local label="$3"
+
+  if [[ -z "${actual}" ]]; then
+    echo "ERROR: ${label}: missing numeric value"
+    return 1
+  fi
+
+  if ! awk -v actual="${actual}" -v minimum="${minimum}" \
+      'BEGIN { exit !((actual + 0.0) >= (minimum + 0.0)) }'; then
+    echo "ERROR: ${label}: actual=${actual}, minimum=${minimum}"
+    return 1
+  fi
+
+  echo "OK: ${label}: actual=${actual}, minimum=${minimum}"
 }
 
 echo "== Causal-SLAM runtime stress =="
@@ -84,8 +143,16 @@ echo "gate_mode=${GATE_MODE}"
 echo "publisher_only=${PUBLISHER_ONLY}"
 echo "qos_reliability=${QOS_RELIABILITY}"
 echo "qos_depth=${QOS_DEPTH}"
+echo "min_input_hz=${MIN_INPUT_HZ}"
+echo "min_checked_hz=${MIN_CHECKED_HZ}"
+echo "fail_on_monitor_warnings=${FAIL_ON_MONITOR_WARNINGS}"
+echo "lidar_holdback_enabled=${LIDAR_HOLDBACK_ENABLED}"
+echo "lidar_holdback_tolerance_ms=${LIDAR_HOLDBACK_TOLERANCE_MS}"
+echo "lidar_holdback_max_pending=${LIDAR_HOLDBACK_MAX_PENDING}"
+echo "imu_buffer_retention_ms=${IMU_BUFFER_RETENTION_MS}"
 echo "lidar_topic=${LIDAR_TOPIC}"
 echo "checked_lidar_topic=${CHECKED_LIDAR_TOPIC}"
+echo "decision_json_topic=${DECISION_JSON_TOPIC}"
 echo "log_dir=${LOG_DIR}"
 
 if ! truthy "${PUBLISHER_ONLY}"; then
@@ -105,6 +172,14 @@ if ! truthy "${PUBLISHER_ONLY}"; then
       -p lidar_qos_depth:="${QOS_DEPTH}" \
       -p checked_lidar_qos_reliability:="${QOS_RELIABILITY}" \
       -p checked_lidar_qos_depth:="${QOS_DEPTH}" \
+      -p lidar_holdback_enabled:="${LIDAR_HOLDBACK_ENABLED}" \
+      -p lidar_holdback_tolerance_ms:="${LIDAR_HOLDBACK_TOLERANCE_MS}" \
+      -p lidar_holdback_max_pending:="${LIDAR_HOLDBACK_MAX_PENDING}" \
+      -p imu_buffer_retention_ms:="${IMU_BUFFER_RETENTION_MS}" \
+      -p lidar_point_time_mode:=explicit \
+      -p lidar_point_time_field:=offset_time \
+      -p lidar_point_time_interpretation:=relative \
+      -p lidar_point_time_unit:=nanoseconds \
       -p tf_monitoring_enabled:=false \
       -p expected_imu_period_ms:="${IMU_PERIOD_MS}" \
       -p imu_gap_threshold_ms:=500.0 \
@@ -145,9 +220,6 @@ fi
 echo
 echo "measuring topic rates for ${DURATION_SEC}s..."
 
-INPUT_HZ_LOG="${LOG_DIR}/${RUN_ID}_input_hz.log"
-OUTPUT_HZ_LOG="${LOG_DIR}/${RUN_ID}_output_hz.log"
-
 setsid timeout "${DURATION_SEC}s" ros2 run causal_slam point_cloud_rate_probe_node --ros-args \
   -r __node:="input_rate_probe_${RUN_ID}" \
   -p topic:="${LIDAR_TOPIC}" \
@@ -156,6 +228,7 @@ setsid timeout "${DURATION_SEC}s" ros2 run causal_slam point_cloud_rate_probe_no
   -p qos_reliability:="${QOS_RELIABILITY}" \
   -p qos_depth:="${QOS_DEPTH}" >"${INPUT_HZ_LOG}" 2>&1 &
 HZ_INPUT_PID="$!"
+PIDS+=("${HZ_INPUT_PID}")
 
 if ! truthy "${PUBLISHER_ONLY}"; then
   setsid timeout "${DURATION_SEC}s" ros2 run causal_slam point_cloud_rate_probe_node --ros-args \
@@ -166,12 +239,19 @@ if ! truthy "${PUBLISHER_ONLY}"; then
     -p qos_reliability:="${QOS_RELIABILITY}" \
     -p qos_depth:="${QOS_DEPTH}" >"${OUTPUT_HZ_LOG}" 2>&1 &
   HZ_OUTPUT_PID="$!"
+  PIDS+=("${HZ_OUTPUT_PID}")
+
+  setsid timeout "${DURATION_SEC}s" ros2 topic echo --full-length \
+    "${DECISION_JSON_TOPIC}" >"${DECISION_JSON_LOG}" 2>&1 &
+  DECISION_JSON_PID="$!"
+  PIDS+=("${DECISION_JSON_PID}")
 fi
 
 wait "${HZ_INPUT_PID}" >/dev/null 2>&1 || true
 
 if ! truthy "${PUBLISHER_ONLY}"; then
   wait "${HZ_OUTPUT_PID}" >/dev/null 2>&1 || true
+  wait "${DECISION_JSON_PID}" >/dev/null 2>&1 || true
 fi
 
 echo
@@ -184,22 +264,62 @@ if ! truthy "${PUBLISHER_ONLY}"; then
   tail -20 "${OUTPUT_HZ_LOG}" || true
 
   echo
+  echo "== decision JSON sample =="
+  tail -20 "${DECISION_JSON_LOG}" || true
+
+  echo
   echo "== monitor warnings =="
-  grep -E "WARN|ERROR|blocked|dropped" "${LOG_DIR}/${RUN_ID}_monitor.log" | tail -40 || true
+  grep -E "${MONITOR_BAD_RE}" "${MONITOR_LOG}" | tail -40 || true
 fi
 
 echo
 echo "== fake LiDAR publisher metrics =="
-grep "FakeLidarPublisher metrics" "${LOG_DIR}/${RUN_ID}_lidar.log" | tail -20 || true
+grep "FakeLidarPublisher metrics" "${LIDAR_LOG}" | tail -20 || true
+
+echo
+echo "== validations =="
+
+INPUT_TOTAL_HZ="$(extract_last_total_hz "${INPUT_HZ_LOG}" "input_lidar")"
+check_float_gte "${INPUT_TOTAL_HZ}" "${MIN_INPUT_HZ}" "input_lidar total_hz"
+
+if ! truthy "${PUBLISHER_ONLY}"; then
+  CHECKED_TOTAL_HZ="$(extract_last_total_hz "${OUTPUT_HZ_LOG}" "checked_lidar")"
+  check_float_gte "${CHECKED_TOTAL_HZ}" "${MIN_CHECKED_HZ}" "checked_lidar total_hz"
+
+  if ! grep -q "data:" "${DECISION_JSON_LOG}"; then
+    echo "ERROR: decision JSON log contains no messages"
+    exit 1
+  fi
+  echo "OK: decision JSON messages observed"
+
+  if grep -E "imu_window_empty|imu_window_incomplete|imu_window_missing_suffix" \
+      "${DECISION_JSON_LOG}"; then
+    echo "ERROR: false IMU window fault detected in decision JSON"
+    exit 1
+  fi
+  echo "OK: no false IMU window faults in decision JSON"
+
+  if truthy "${FAIL_ON_MONITOR_WARNINGS}"; then
+    if grep -E "${MONITOR_BAD_RE}" "${MONITOR_LOG}"; then
+      echo "ERROR: monitor warnings/errors detected"
+      exit 1
+    fi
+    echo "OK: no monitor warnings/errors"
+  fi
+fi
 
 echo
 echo "runtime stress logs:"
 if ! truthy "${PUBLISHER_ONLY}"; then
-  echo "  ${LOG_DIR}/${RUN_ID}_monitor.log"
-  echo "  ${LOG_DIR}/${RUN_ID}_imu.log"
+  echo "  ${MONITOR_LOG}"
+  echo "  ${IMU_LOG}"
 fi
-echo "  ${LOG_DIR}/${RUN_ID}_lidar.log"
+echo "  ${LIDAR_LOG}"
 echo "  ${INPUT_HZ_LOG}"
 if ! truthy "${PUBLISHER_ONLY}"; then
   echo "  ${OUTPUT_HZ_LOG}"
+  echo "  ${DECISION_JSON_LOG}"
 fi
+
+echo
+echo "runtime stress result: OK"

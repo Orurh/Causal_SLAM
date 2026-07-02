@@ -37,6 +37,14 @@ GATE_TF_MONITORING_ENABLED ?= true
 
 WARN_RE := warning:|error:|fatal error|undefined reference|CMake Error|FAILED|not found:|Unable to find required file
 
+CLANG_FORMAT ?= clang-format
+CLANG_FORMAT_STYLE ?= file
+
+CPPCHECK ?= cppcheck
+CPPCHECK_STD ?= c++20
+CPPCHECK_ENABLE ?= warning,performance,portability
+CPPCHECK_LOG := $(MANUAL_LOG_DIR)/cppcheck.log
+
 COLCON_BUILD := \
 	colcon build \
 		--base-paths "$(WS_DIR)" \
@@ -47,7 +55,16 @@ COLCON_BUILD := \
 			-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 			-DBUILD_TESTING=$(BUILD_TESTING)
 
-.PHONY: help dirs build clean-build rebuild test arch smoke ci warnings check-warnings gate demo-healthy demo-imu-lag demo-imu-drop demo-tf-missing clean-bak clean-generated clean-tmp clean-colcon-logs clean-nested clean-local clean-all status benchmark runtime-stress
+.PHONY: \
+	help dirs \
+	build clean-build rebuild test \
+	arch smoke ci warnings check-warnings \
+	format format-check cppcheck quality \
+	gate \
+	demo-healthy demo-imu-lag demo-imu-drop demo-tf-missing \
+	clean-bak clean-generated clean-tmp clean-colcon-logs clean-nested clean-local clean-all \
+	status benchmark runtime-stress
+
 
 help:
 	@echo "Causal-SLAM Make targets"
@@ -101,6 +118,11 @@ help:
 	@echo "  GATE_QOS_RELIABILITY=$(GATE_QOS_RELIABILITY)"
 	@echo "  GATE_QOS_DEPTH=$(GATE_QOS_DEPTH)"
 	@echo "  GATE_TF_MONITORING_ENABLED=$(GATE_TF_MONITORING_ENABLED)"
+	@echo "  CLANG_FORMAT=$(CLANG_FORMAT)"
+	@echo "  CLANG_FORMAT_STYLE=$(CLANG_FORMAT_STYLE)"
+	@echo "  CPPCHECK=$(CPPCHECK)"
+	@echo "  CPPCHECK_STD=$(CPPCHECK_STD)"
+	@echo "  CPPCHECK_ENABLE=$(CPPCHECK_ENABLE)"
 	@echo
 	@echo "Examples:"
 	@echo "  make ci"
@@ -112,6 +134,16 @@ help:
 	@echo "  make gate GATE_TF_MONITORING_ENABLED=false"
 	@echo "  make gate GATE_CONFIG=config/temporal_gate.yaml"
 	@echo "  make gate GATE_CONFIG=config/gate.env"
+	@echo "Checks:"
+	@echo "  make arch               architecture dependency check"
+	@echo "  make smoke              temporal gate smoke test"
+	@echo "  make warnings           show warnings/errors from last build log"
+	@echo "  make check-warnings     fail if build log contains warnings/errors"
+	@echo "  make format             apply clang-format to C++ sources"
+	@echo "  make format-check       check C++ formatting without modifying files"
+	@echo "  make cppcheck           run cppcheck static analysis"
+	@echo "  make quality            format-check + cppcheck + warning check"
+	@echo "  make status             git status + workspace tree"
 
 dirs:
 	mkdir -p "$(MANUAL_LOG_DIR)" "$(SMOKE_LOG_DIR)"
@@ -173,6 +205,66 @@ check-warnings:
 		exit 1
 	fi
 	echo "Build log warnings/errors: none"
+
+
+format:
+	cd "$(PKG_DIR)"
+	if ! command -v "$(CLANG_FORMAT)" >/dev/null 2>&1; then
+		echo "Missing $(CLANG_FORMAT). Install clang-format first."
+		exit 1
+	fi
+	mapfile -d '' files < <(find src tests -type f \
+		\( -name '*.cc' -o -name '*.cpp' -o -name '*.cxx' -o \
+		   -name '*.h' -o -name '*.hpp' -o -name '*.hh' \) \
+		-print0)
+	if (( $${#files[@]} == 0 )); then
+		echo "No C++ files found for clang-format"
+		exit 0
+	fi
+	"$(CLANG_FORMAT)" --style="$(CLANG_FORMAT_STYLE)" -i "$${files[@]}"
+	echo "clang-format applied to $${#files[@]} files"
+
+format-check:
+	cd "$(PKG_DIR)"
+	if ! command -v "$(CLANG_FORMAT)" >/dev/null 2>&1; then
+		echo "Missing $(CLANG_FORMAT). Install clang-format first."
+		exit 1
+	fi
+	mapfile -d '' files < <(find src tests -type f \
+		\( -name '*.cc' -o -name '*.cpp' -o -name '*.cxx' -o \
+		   -name '*.h' -o -name '*.hpp' -o -name '*.hh' \) \
+		-print0)
+	if (( $${#files[@]} == 0 )); then
+		echo "No C++ files found for clang-format"
+		exit 0
+	fi
+	"$(CLANG_FORMAT)" --style="$(CLANG_FORMAT_STYLE)" --dry-run --Werror "$${files[@]}"
+	echo "clang-format check: OK"
+
+cppcheck: build dirs
+	cd "$(WS_DIR)"
+	if ! command -v "$(CPPCHECK)" >/dev/null 2>&1; then
+		echo "Missing $(CPPCHECK). Install cppcheck first."
+		exit 1
+	fi
+	test -f "$(WS_DIR)/compile_commands.json"
+	"$(CPPCHECK)" \
+		--project="$(WS_DIR)/compile_commands.json" \
+		--file-filter="$(WS_DIR)/src/*" \
+		--file-filter="$(WS_DIR)/tools/*" \
+		--std="$(CPPCHECK_STD)" \
+		--enable="$(CPPCHECK_ENABLE)" \
+		--inline-suppr \
+		--suppress=missingIncludeSystem \
+		--suppress=passedByValueCallback \
+		--suppress=useStlAlgorithm \
+		--suppress=useInitializationList \
+		--template=gcc \
+		--error-exitcode=1 \
+		2>&1 | tee "$(CPPCHECK_LOG)"
+	echo "cppcheck: OK"
+
+quality: format-check cppcheck check-warnings
 
 gate: build
 	cd "$(WS_DIR)"
@@ -255,14 +347,14 @@ benchmark: build
 	ros2 run "$(PKG)" point_time_extraction_benchmark
 
 runtime-stress: build
-	cd "$(WS_DIR)"
-	unset AMENT_PREFIX_PATH CMAKE_PREFIX_PATH COLCON_PREFIX_PATH
-	source "$(ROS_SETUP)"
-	source "$(WS_SETUP)"
+	cd "$(WS_DIR)" && \
+	unset AMENT_PREFIX_PATH CMAKE_PREFIX_PATH COLCON_PREFIX_PATH && \
+	source "$(ROS_SETUP)" && \
+	source "$(WS_SETUP)" && \
 	CAUSAL_SLAM_RUNTIME_STRESS_GATE_MODE=observe \
 	CAUSAL_SLAM_RUNTIME_STRESS_QOS_RELIABILITY=reliable \
 	CAUSAL_SLAM_RUNTIME_STRESS_QOS_DEPTH=20 \
 	CAUSAL_SLAM_RUNTIME_STRESS_POINT_COUNT=1000000 \
 	CAUSAL_SLAM_RUNTIME_STRESS_LIDAR_PERIOD_MS=100.0 \
 	CAUSAL_SLAM_RUNTIME_STRESS_DURATION_SEC=30 \
-	./src/causal_slam/scripts/runtime_stress_temporal_gate.sh\n\n
+	"$(PKG_DIR)/scripts/runtime_stress_temporal_gate.sh"

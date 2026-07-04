@@ -446,7 +446,7 @@ void TemporalMonitorNode::ProcessLidarCloud(PointCloud2Msg::ConstSharedPtr msg, 
   const auto scan_snapshot = temporal_pipeline_->BuildLatestDiagnosticSnapshot();
   const auto scan_map_update_decision = causal_slam::policy::DecideMapUpdate(scan_snapshot.overall_status);
 
-  PublishDiagnosticTopics(scan_snapshot, scan_map_update_decision);
+  PublishDiagnosticTopics(scan_snapshot, scan_map_update_decision, false);
 
   const auto forwarding_decision = MaybePublishCheckedLidar(*msg, scan_snapshot);
 
@@ -514,7 +514,8 @@ causal_slam::statistics::CloudForwardingDecision TemporalMonitorNode::MaybePubli
 }
 
 void TemporalMonitorNode::PublishDiagnosticTopics(const diagnostics::TemporalDiagnosticSnapshot& snapshot,
-                                                  const policy::MapUpdateDecision& map_update_decision) {
+                                                  const policy::MapUpdateDecision& map_update_decision,
+                                                  bool publish_decision_json) {
   BoolMsg map_update_allowed_msg;
   map_update_allowed_msg.data = map_update_decision.map_update_allowed;
   map_update_allowed_publisher_->publish(map_update_allowed_msg);
@@ -532,20 +533,22 @@ void TemporalMonitorNode::PublishDiagnosticTopics(const diagnostics::TemporalDia
   fault_reasons_msg.data = diagnostics::JoinFaultReasons(snapshot.issues);
   fault_reasons_publisher_->publish(fault_reasons_msg);
 
-  StringMsg decision_json_msg;
-  decision_json_msg.data = render::RenderMapUpdateDecisionJson(snapshot, map_update_decision);
-  map_update_decision_json_publisher_->publish(decision_json_msg);
+  if (publish_decision_json) {
+    StringMsg decision_json_msg;
+    decision_json_msg.data = render::RenderMapUpdateDecisionJson(snapshot, map_update_decision);
+    map_update_decision_json_publisher_->publish(decision_json_msg);
+  }
 }
 
 void TemporalMonitorNode::OnTimer() {
-  if (runtime_profile_ == RuntimeProfile::kMinimal) {
-    return;
-  }
-
   const std::int64_t now_ns = this->now().nanoseconds();
   const auto snapshot = temporal_pipeline_->BuildSnapshot(now_ns);
 
-  PublishDiagnosticTopics(snapshot.diagnostics, snapshot.map_update_decision);
+  PublishDiagnosticTopics(snapshot.diagnostics, snapshot.map_update_decision, true);
+
+  if (runtime_profile_ == RuntimeProfile::kMinimal) {
+    return;
+  }
 
   if (runtime_profile_ == RuntimeProfile::kDiagnostic) {
     RCLCPP_INFO_STREAM(this->get_logger(), "Temporal gate summary"

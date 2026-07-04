@@ -41,7 +41,8 @@ class TemporalMonitorNode final : public rclcpp::Node {
   void DropOldestPendingLidarCloudsIfNeeded();
   void ObserveConfiguredTransformsForLidar(const PointCloud2Msg& msg, std::int64_t header_stamp_ns, std::int64_t receive_time_ns);
   void PublishDiagnosticTopics(const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot,
-                               const causal_slam::policy::MapUpdateDecision& map_update_decision);
+                               const causal_slam::policy::MapUpdateDecision& map_update_decision,
+                               bool publish_decision_json);
   [[nodiscard]] causal_slam::statistics::CloudForwardingDecision MaybePublishCheckedLidar(
       const PointCloud2Msg& msg, const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot);
   [[nodiscard]] std::int64_t ComputeLidarHoldbackReadyStampNs(

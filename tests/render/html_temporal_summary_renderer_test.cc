@@ -33,7 +33,9 @@ TEST(HtmlTemporalSummaryRendererTest, RendersStandaloneHtmlPage) {
   EXPECT_NE(html.find("<title>Causal-SLAM Temporal Report</title>"), std::string::npos);
   EXPECT_NE(html.find("Temporal Health"), std::string::npos);
   EXPECT_NE(html.find("Map update"), std::string::npos);
-  EXPECT_NE(html.find("Temporal Statistics"), std::string::npos);
+  EXPECT_NE(html.find("Causal-SLAM Temporal Report"), std::string::npos);
+  EXPECT_NE(html.find("<div class=\"grid\">"), std::string::npos);
+  EXPECT_EQ(html.find("<h1>Temporal Statistics</h1>"), std::string::npos);
 }
 
 TEST(HtmlTemporalSummaryRendererTest, EscapesUnsafeText) {

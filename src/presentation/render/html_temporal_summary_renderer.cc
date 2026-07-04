@@ -161,10 +161,10 @@ void RenderSection(std::ostringstream& out, const causal_slam::report::ReportSec
   out << "</section>\n";
 }
 
-std::string RenderDocumentBody(const causal_slam::report::ReportDocument& document) {
+std::string RenderDocumentBody(const causal_slam::report::ReportDocument& document, bool include_title) {
   std::ostringstream out;
 
-  if (!document.title.empty()) {
+  if (include_title && !document.title.empty()) {
     out << "<h1>" << EscapeHtml(document.title) << "</h1>\n";
   }
 
@@ -327,17 +327,21 @@ code {
 std::string HtmlTemporalSummaryRenderer::RenderDiagnostics(const causal_slam::diagnostics::TemporalDiagnosticSnapshot& snapshot,
                                                            const causal_slam::policy::MapUpdateDecision& map_update_decision) const {
   const causal_slam::report::TemporalReportBuilder builder;
-  return RenderDocumentBody(builder.BuildDiagnosticsReport(snapshot, map_update_decision));
+  return RenderDocumentBody(builder.BuildDiagnosticsReport(snapshot, map_update_decision), true);
 }
 
 std::string HtmlTemporalSummaryRenderer::RenderStatistics(const causal_slam::statistics::TemporalStatisticsSnapshot& snapshot) const {
   const causal_slam::report::TemporalReportBuilder builder;
-  return RenderDocumentBody(builder.BuildStatisticsReport(snapshot));
+  return RenderDocumentBody(builder.BuildStatisticsReport(snapshot), true);
 }
 
 std::string HtmlTemporalSummaryRenderer::RenderPage(const causal_slam::diagnostics::TemporalDiagnosticSnapshot& diagnostics,
                                                     const causal_slam::policy::MapUpdateDecision& map_update_decision,
                                                     const causal_slam::statistics::TemporalStatisticsSnapshot& statistics) const {
+  const causal_slam::report::TemporalReportBuilder builder;
+  const auto diagnostics_document = builder.BuildDiagnosticsReport(diagnostics, map_update_decision);
+  const auto statistics_document = builder.BuildStatisticsReport(statistics);
+
   std::ostringstream out;
 
   out << "<!doctype html>\n"
@@ -353,7 +357,9 @@ std::string HtmlTemporalSummaryRenderer::RenderPage(const causal_slam::diagnosti
       << "<main>\n"
       << "<h1>Causal-SLAM Temporal Report</h1>\n"
       << "<div class=\"grid\">\n"
-      << RenderDiagnostics(diagnostics, map_update_decision) << RenderStatistics(statistics) << "</div>\n"
+      << RenderDocumentBody(diagnostics_document, false)
+      << RenderDocumentBody(statistics_document, false)
+      << "</div>\n"
       << "</main>\n"
       << "</body>\n"
       << "</html>\n";

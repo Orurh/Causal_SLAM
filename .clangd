@@ -1,5 +1,5 @@
 CompileFlags:
-  CompilationDatabase: .
+  CompilationDatabase: ../../build/causal_slam
   Add:
     - -I/opt/ros/jazzy/include
     - -I${workspaceFolder}/src/causal_slam/src

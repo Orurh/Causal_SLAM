@@ -18,32 +18,21 @@ std::int64_t MillisecondsToNanoseconds(double milliseconds) {
 
 class ImuFaultInjectionNode final : public rclcpp::Node {
  public:
-  explicit ImuFaultInjectionNode(
-      const rclcpp::NodeOptions& options = rclcpp::NodeOptions{})
+  explicit ImuFaultInjectionNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions{})
       : rclcpp::Node("imu_fault_injection_node", options) {
-    const std::string input_topic =
-        this->declare_parameter<std::string>("input_topic", "/imu/raw");
-    const std::string output_topic =
-        this->declare_parameter<std::string>("output_topic", "/imu/faulty");
+    const std::string input_topic = this->declare_parameter<std::string>("input_topic", "/imu/raw");
+    const std::string output_topic = this->declare_parameter<std::string>("output_topic", "/imu/faulty");
 
-    const double timestamp_shift_ms =
-        this->declare_parameter<double>("timestamp_shift_ms", 0.0);
+    const double timestamp_shift_ms = this->declare_parameter<double>("timestamp_shift_ms", 0.0);
     timestamp_shift_ns_ = MillisecondsToNanoseconds(timestamp_shift_ms);
 
-    const int drop_every_n =
-        this->declare_parameter<int>("drop_every_n", 0);
+    const int drop_every_n = this->declare_parameter<int>("drop_every_n", 0);
     drop_every_n_ = static_cast<std::uint64_t>(std::max(drop_every_n, 0));
 
-    publisher_ =
-        this->create_publisher<sensor_msgs::msg::Imu>(
-            output_topic, rclcpp::SensorDataQoS{});
+    publisher_ = this->create_publisher<sensor_msgs::msg::Imu>(output_topic, rclcpp::SensorDataQoS{});
 
-    subscription_ =
-        this->create_subscription<sensor_msgs::msg::Imu>(
-            input_topic, rclcpp::SensorDataQoS{},
-            [this](sensor_msgs::msg::Imu::ConstSharedPtr msg) {
-              OnImu(msg);
-            });
+    subscription_ = this->create_subscription<sensor_msgs::msg::Imu>(input_topic, rclcpp::SensorDataQoS{},
+                                                                     [this](sensor_msgs::msg::Imu::ConstSharedPtr msg) { OnImu(msg); });
 
     RCLCPP_INFO(this->get_logger(),
                 "ImuFaultInjectionNode started"
@@ -51,10 +40,7 @@ class ImuFaultInjectionNode final : public rclcpp::Node {
                 " | output_topic=%s"
                 " | timestamp_shift_ms=%.3f"
                 " | drop_every_n=%lu",
-                input_topic.c_str(),
-                output_topic.c_str(),
-                timestamp_shift_ms,
-                static_cast<unsigned long>(drop_every_n_));
+                input_topic.c_str(), output_topic.c_str(), timestamp_shift_ms, static_cast<unsigned long>(drop_every_n_));
   }
 
  private:
@@ -67,8 +53,7 @@ class ImuFaultInjectionNode final : public rclcpp::Node {
 
     auto output = *msg;
 
-    const std::int64_t shifted_stamp_ns =
-        rclcpp::Time(output.header.stamp).nanoseconds() + timestamp_shift_ns_;
+    const std::int64_t shifted_stamp_ns = rclcpp::Time(output.header.stamp).nanoseconds() + timestamp_shift_ns_;
     output.header.stamp = rclcpp::Time(shifted_stamp_ns);
 
     publisher_->publish(output);

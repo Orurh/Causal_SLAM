@@ -54,11 +54,11 @@ void LogTimingSummary(const rclcpp::Logger& logger, const telemetry::StreamTimin
 }
 
 std::string ResolveSourceFrame(const std::string& configured_source_frame, const std::string& cloud_frame_id) {
-  if (!configured_source_frame.empty()) {
-    return configured_source_frame;
+  if (configured_source_frame.empty() || configured_source_frame == "<cloud_frame>" || configured_source_frame == "cloud_frame") {
+    return cloud_frame_id;
   }
 
-  return cloud_frame_id;
+  return configured_source_frame;
 }
 
 policy::LidarCloudGateInput BuildLidarCloudGateInput(const diagnostics::TemporalDiagnosticSnapshot& snapshot) {

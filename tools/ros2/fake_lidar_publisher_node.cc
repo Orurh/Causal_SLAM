@@ -44,7 +44,6 @@ std::int64_t MillisecondsToNanoseconds(double milliseconds) {
   return static_cast<std::int64_t>(milliseconds * nanoseconds_per_millisecond);
 }
 
-
 double DurationUs(SteadyClock::duration duration) {
   return std::chrono::duration<double, std::micro>(duration).count();
 }
@@ -72,18 +71,12 @@ class FakeLidarPublisherNode final : public rclcpp::Node {
     const double scan_duration_ms = this->declare_parameter<double>("scan_duration_ms", safe_period_ms);
     scan_duration_ms_ = std::max(scan_duration_ms, 0.0);
 
-    perf_metrics_enabled_ =
-        this->declare_parameter<bool>("perf_metrics_enabled", false);
-    const double perf_metrics_period_ms =
-        this->declare_parameter<double>("perf_metrics_period_ms", 2000.0);
-    const double safe_perf_metrics_period_ms =
-        std::max(perf_metrics_period_ms, 100.0);
+    perf_metrics_enabled_ = this->declare_parameter<bool>("perf_metrics_enabled", false);
+    const double perf_metrics_period_ms = this->declare_parameter<double>("perf_metrics_period_ms", 2000.0);
+    const double safe_perf_metrics_period_ms = std::max(perf_metrics_period_ms, 100.0);
 
-    const std::string qos_reliability =
-        this->declare_parameter<std::string>("qos_reliability", "best_effort");
-    const int qos_depth = std::max(
-        static_cast<int>(this->declare_parameter<int>("qos_depth", 5)),
-        1);
+    const std::string qos_reliability = this->declare_parameter<std::string>("qos_reliability", "best_effort");
+    const int qos_depth = std::max(static_cast<int>(this->declare_parameter<int>("qos_depth", 5)), 1);
 
     lidar_publisher_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
         lidar_topic, causal_slam::ros_support::MakePointCloudQos(qos_reliability, qos_depth));
@@ -94,9 +87,7 @@ class FakeLidarPublisherNode final : public rclcpp::Node {
 
     if (perf_metrics_enabled_) {
       perf_metrics_timer_ = this->create_wall_timer(
-          std::chrono::duration_cast<std::chrono::milliseconds>(
-              std::chrono::duration<double, std::milli>(
-                  safe_perf_metrics_period_ms)),
+          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::duration<double, std::milli>(safe_perf_metrics_period_ms)),
           [this]() { LogPerfMetrics(); });
     }
 
@@ -113,9 +104,7 @@ class FakeLidarPublisherNode final : public rclcpp::Node {
                 " | qos_reliability=%s"
                 " | qos_depth=%d",
                 lidar_topic.c_str(), frame_id_.c_str(), safe_period_ms, point_count_, include_xyz_fields_ ? "true" : "false",
-                time_field_mode_.c_str(), scan_duration_ms_,
-                perf_metrics_enabled_ ? "true" : "false",
-                qos_reliability.c_str(), qos_depth);
+                time_field_mode_.c_str(), scan_duration_ms_, perf_metrics_enabled_ ? "true" : "false", qos_reliability.c_str(), qos_depth);
   }
 
  private:
@@ -124,8 +113,7 @@ class FakeLidarPublisherNode final : public rclcpp::Node {
 
     std::optional<double> actual_period_us;
     if (last_publish_started_at_.has_value()) {
-      actual_period_us =
-          DurationUs(callback_started_at - *last_publish_started_at_);
+      actual_period_us = DurationUs(callback_started_at - *last_publish_started_at_);
     }
     last_publish_started_at_ = callback_started_at;
 
@@ -159,18 +147,12 @@ class FakeLidarPublisherNode final : public rclcpp::Node {
 
     ++published_count_;
 
-    RecordPerfMetrics(
-        DurationUs(generation_finished_at - generation_started_at),
-        DurationUs(publish_finished_at - publish_started_at),
-        actual_period_us,
-        msg.data.size());
+    RecordPerfMetrics(DurationUs(generation_finished_at - generation_started_at), DurationUs(publish_finished_at - publish_started_at),
+                      actual_period_us, msg.data.size());
   }
 
-  void RecordPerfMetrics(
-      double generation_us,
-      double publish_call_us,
-      std::optional<double> actual_period_us,
-      std::size_t data_size_bytes) {
+  void RecordPerfMetrics(double generation_us, double publish_call_us, std::optional<double> actual_period_us,
+                         std::size_t data_size_bytes) {
     if (!perf_metrics_enabled_) {
       return;
     }
@@ -205,26 +187,17 @@ class FakeLidarPublisherNode final : public rclcpp::Node {
     }
 
     const double count = static_cast<double>(perf_window_count_);
-    const double period_count =
-        std::max<double>(static_cast<double>(perf_period_count_), 1.0);
-    const double mib =
-        static_cast<double>(perf_window_bytes_) / 1024.0 / 1024.0;
+    const double period_count = std::max<double>(static_cast<double>(perf_period_count_), 1.0);
+    const double mib = static_cast<double>(perf_window_bytes_) / 1024.0 / 1024.0;
 
-    RCLCPP_INFO(
-        this->get_logger(),
-        "FakeLidarPublisher metrics | published_count=%lu | window_count=%lu | "
-        "window_mib=%.3f | generation_avg_ms=%.3f | generation_max_ms=%.3f | "
-        "publish_call_avg_ms=%.3f | publish_call_max_ms=%.3f | "
-        "actual_period_avg_ms=%.3f | actual_period_max_ms=%.3f",
-        published_count_,
-        perf_window_count_,
-        mib,
-        perf_generation_total_us_ / count / 1000.0,
-        perf_generation_max_us_ / 1000.0,
-        perf_publish_total_us_ / count / 1000.0,
-        perf_publish_max_us_ / 1000.0,
-        perf_period_total_us_ / period_count / 1000.0,
-        perf_period_max_us_ / 1000.0);
+    RCLCPP_INFO(this->get_logger(),
+                "FakeLidarPublisher metrics | published_count=%lu | window_count=%lu | "
+                "window_mib=%.3f | generation_avg_ms=%.3f | generation_max_ms=%.3f | "
+                "publish_call_avg_ms=%.3f | publish_call_max_ms=%.3f | "
+                "actual_period_avg_ms=%.3f | actual_period_max_ms=%.3f",
+                published_count_, perf_window_count_, mib, perf_generation_total_us_ / count / 1000.0, perf_generation_max_us_ / 1000.0,
+                perf_publish_total_us_ / count / 1000.0, perf_publish_max_us_ / 1000.0, perf_period_total_us_ / period_count / 1000.0,
+                perf_period_max_us_ / 1000.0);
 
     perf_window_count_ = 0;
     perf_window_bytes_ = 0;

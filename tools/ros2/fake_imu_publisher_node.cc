@@ -30,8 +30,7 @@ class FakeImuPublisherNode final : public rclcpp::Node {
     const double period_ms = this->declare_parameter<double>("period_ms", 10.0);
     const double safe_period_ms = std::max(period_ms, 1.0);
 
-    const double timestamp_shift_ms =
-        this->declare_parameter<double>("timestamp_shift_ms", 0.0);
+    const double timestamp_shift_ms = this->declare_parameter<double>("timestamp_shift_ms", 0.0);
     timestamp_shift_ns_ = MillisecondsToNanoseconds(timestamp_shift_ms);
 
     const int drop_every_n = this->declare_parameter<int>("drop_every_n", 0);
@@ -47,10 +46,7 @@ class FakeImuPublisherNode final : public rclcpp::Node {
                 " | period_ms=%.3f"
                 " | timestamp_shift_ms=%.3f"
                 " | drop_every_n=%lu",
-                imu_topic.c_str(),
-                safe_period_ms,
-                timestamp_shift_ms,
-                static_cast<unsigned long>(drop_every_n_));
+                imu_topic.c_str(), safe_period_ms, timestamp_shift_ms, static_cast<unsigned long>(drop_every_n_));
   }
 
  private:

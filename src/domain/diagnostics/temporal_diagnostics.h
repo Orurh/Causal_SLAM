@@ -22,7 +22,12 @@ enum class TemporalFaultReason : std::uint8_t {
   kStreamTimingUnstable,
   kImuStreamTimingUnstable,
   kLidarStreamTimingUnstable,
+
   kNoLidarScanReceivedYet,
+  kNoImuSampleReceivedYet,
+  kLidarStreamStale,
+  kImuStreamStale,
+
   kImuWindowIncomplete,
 
   kLidarPointTimeUnsupported,

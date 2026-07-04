@@ -1,5 +1,6 @@
 set(CAUSAL_SLAM_DOMAIN_SOURCES
   src/domain/telemetry/stream_timing_tracker.cc
+  src/domain/telemetry/stream_staleness_analyzer.cc
   src/domain/sensors/transform/transform_age_analyzer.cc
 
   src/domain/sensors/lidar/lidar_scan_timing.cc

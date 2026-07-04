@@ -20,6 +20,22 @@ TEST(TemporalFaultReasonFormatterTest, EmptyIssuesProducesNone) {
   EXPECT_EQ(JoinFaultReasons({}), "none");
 }
 
+TEST(TemporalFaultReasonFormatterTest, FaultReasonStringsAreStable) {
+  EXPECT_STREQ(ToString(TemporalFaultReason::kNoLidarScanReceivedYet), "no_lidar_scan_received_yet");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kNoImuSampleReceivedYet), "no_imu_sample_received_yet");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kLidarStreamStale), "lidar_stream_stale");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kImuStreamStale), "imu_stream_stale");
+}
+
+TEST(TemporalFaultReasonFormatterTest, StaleStreamReasonsAreJoined) {
+  const std::vector<TemporalDiagnosticIssue> issues{
+      MakeIssue(TemporalDiagnosticSeverity::kDegraded, TemporalFaultReason::kLidarStreamStale, "lidar stale"),
+      MakeIssue(TemporalDiagnosticSeverity::kDegraded, TemporalFaultReason::kImuStreamStale, "imu stale"),
+  };
+
+  EXPECT_EQ(JoinFaultReasons(issues), "lidar_stream_stale,imu_stream_stale");
+}
+
 TEST(TemporalFaultReasonFormatterTest, SingleIssueProducesReason) {
   const std::vector<TemporalDiagnosticIssue> issues{
       MakeIssue(TemporalDiagnosticSeverity::kDegraded, TemporalFaultReason::kImuWindowIncomplete, "test"),

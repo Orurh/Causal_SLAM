@@ -88,9 +88,9 @@ CheckOptions:
   # ---------- Константы по Google Style (kCamelCase) ----------
   # Общие константы (const/constexpr)
   - key: readability-identifier-naming.ConstantCase
-    value: CamelCase
-  - key: readability-identifier-naming.ConstantPrefix
-    value: 'k'
+    value: lower_case
+  # - key: readability-identifier-naming.ConstantPrefix
+  #   value: 'k'
 
   # Константы-члены классов (включая static const/constexpr)
   - key: readability-identifier-naming.MemberConstantCase

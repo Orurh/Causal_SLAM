@@ -268,6 +268,12 @@ const char* ToString(TemporalFaultReason reason) {
       return "tf_age_too_high";
     case TemporalFaultReason::kTfTransformFromFuture:
       return "tf_transform_from_future";
+    case TemporalFaultReason::kNoImuSampleReceivedYet:
+      return "no_imu_sample_received_yet";
+    case TemporalFaultReason::kLidarStreamStale:
+      return "lidar_stream_stale";
+    case TemporalFaultReason::kImuStreamStale:
+      return "imu_stream_stale";
   }
 
   return "unknown";

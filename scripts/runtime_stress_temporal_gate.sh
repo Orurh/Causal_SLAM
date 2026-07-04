@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 PACKAGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WS_DIR="${PACKAGE_DIR}"
+WS_DIR="$(cd "${PACKAGE_DIR}/../.." && pwd)"
 
 set +u
 source /opt/ros/jazzy/setup.bash

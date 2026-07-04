@@ -36,6 +36,32 @@ ament_target_dependencies(temporal_status_bridge_node
 causal_slam_target_include_src(temporal_status_bridge_node)
 causal_slam_install_ros2_executable(temporal_status_bridge_node)
 
+add_executable(causal_slam_analyze_bag
+  src/apps/ros2/analyze_bag_main.cc
+  src/apps/ros2/analyze_bag_app.cc
+)
+
+ament_target_dependencies(causal_slam_analyze_bag
+  rclcpp
+  sensor_msgs
+  builtin_interfaces
+  rosbag2_cpp
+  rosbag2_storage
+)
+
+target_link_libraries(causal_slam_analyze_bag
+  causal_slam_ros_adapters
+)
+
+if(TARGET causal_slam_domain)
+  target_link_libraries(causal_slam_analyze_bag
+    causal_slam_domain
+  )
+endif()
+
+causal_slam_target_include_src(causal_slam_analyze_bag)
+causal_slam_install_ros2_executable(causal_slam_analyze_bag)
+
 # Developer/demo ROS2 tools.
 add_executable(fake_imu_publisher_node
   tools/ros2/fake_imu_publisher_node.cc

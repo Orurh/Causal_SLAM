@@ -7,8 +7,7 @@ namespace causal_slam::report {
 
 class OfflineTemporalReportDocumentBuilder final {
  public:
-  [[nodiscard]] ReportDocument Build(
-      const causal_slam::offline_analysis::OfflineTemporalReport& report) const;
+  [[nodiscard]] ReportDocument Build(const causal_slam::offline_analysis::OfflineTemporalReport& report) const;
 };
 
 }  // namespace causal_slam::report

@@ -39,6 +39,7 @@ causal_slam_install_ros2_executable(temporal_status_bridge_node)
 add_executable(causal_slam_analyze_bag
   src/apps/ros2/analyze_bag_main.cc
   src/apps/ros2/analyze_bag_app.cc
+  src/apps/ros2/analyze_bag_cli.cc
 )
 
 ament_target_dependencies(causal_slam_analyze_bag

@@ -9,8 +9,8 @@ namespace causal_slam::report {
 namespace {
 
 const ReportSection* FindSection(const ReportDocument& document, std::string_view id) {
-  const auto it = std::find_if(document.sections.begin(), document.sections.end(),
-                               [id](const ReportSection& section) { return section.id == id; });
+  const auto it =
+      std::find_if(document.sections.begin(), document.sections.end(), [id](const ReportSection& section) { return section.id == id; });
   if (it == document.sections.end()) {
     return nullptr;
   }
@@ -18,8 +18,8 @@ const ReportSection* FindSection(const ReportDocument& document, std::string_vie
 }
 
 const ReportMetric* FindMetric(const ReportSection& section, std::string_view name) {
-  const auto it = std::find_if(section.metrics.begin(), section.metrics.end(),
-                               [name](const ReportMetric& metric) { return metric.name == name; });
+  const auto it =
+      std::find_if(section.metrics.begin(), section.metrics.end(), [name](const ReportMetric& metric) { return metric.name == name; });
   if (it == section.metrics.end()) {
     return nullptr;
   }

@@ -74,11 +74,19 @@ struct LidarScanWindowSummary {
   std::uint64_t failed = 0;
   std::uint64_t points_total = 0;
   std::uint64_t points_used = 0;
+
   bool has_duration = false;
   double duration_mean_ms = 0.0;
   double duration_min_ms = 0.0;
   double duration_max_ms = 0.0;
   double duration_stddev_ms = 0.0;
+
+  std::uint64_t duration_outlier_count = 0;
+  double duration_outlier_ratio = 0.0;
+  double duration_outlier_threshold_ms = 200.0;
+  std::uint64_t worst_duration_outlier_scan_index = 0;
+  double worst_duration_outlier_ms = 0.0;
+
   std::string source = "none";
   std::string confidence = "UNKNOWN";
   std::string time_unit = "unknown";

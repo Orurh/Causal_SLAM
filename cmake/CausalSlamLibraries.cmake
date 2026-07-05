@@ -53,8 +53,11 @@ set(CAUSAL_SLAM_PRESENTATION_SOURCES
   src/presentation/render/console_temporal_summary_renderer.cc
   src/presentation/render/html_temporal_summary_renderer.cc
   src/presentation/render/map_update_decision_json_renderer.cc
+  src/presentation/render/report_document_html_renderer.cc
+  src/presentation/render/offline_temporal_report_html_renderer.cc
   src/presentation/render/offline_temporal_report_json_renderer.cc
   src/presentation/render/offline_temporal_report_console_renderer.cc
+  src/presentation/render/offline_temporal_report_artifact_writer.cc
 )
 
 add_library(causal_slam_presentation STATIC

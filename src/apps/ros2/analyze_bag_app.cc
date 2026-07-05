@@ -1,10 +1,11 @@
 #include "apps/ros2/analyze_bag_app.h"
 
+#include "apps/ros2/analyze_bag_cli.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <exception>
-#include <fstream>
 #include <iostream>
 #include <map>
 #include <optional>
@@ -22,15 +23,15 @@
 #include <sensor_msgs/msg/point_field.hpp>
 
 #include "adapters/ros2/point_cloud2_conversions.h"
-#include "application/offline_analysis/offline_temporal_report.h"
-#include "presentation/render/offline_temporal_report_json_renderer.h"
-#include "presentation/render/offline_temporal_report_console_renderer.h"
 #include "domain/sensors/imu/imu_coverage_analyzer.h"
 #include "domain/sensors/lidar/lidar_scan_window_estimator.h"
 #include "domain/time/time_units.h"
+#include "presentation/render/offline_temporal_report_artifact_writer.h"
+#include "presentation/render/offline_temporal_report_console_renderer.h"
 
 namespace {
 
+using causal_slam::apps::ros2::AnalyzeBagOptions;
 using causal_slam::offline_analysis::BagSummary;
 using causal_slam::offline_analysis::DatasetVerdict;
 using causal_slam::offline_analysis::LidarFirstCloudSummary;
@@ -41,132 +42,13 @@ using causal_slam::offline_analysis::PointFieldSummary;
 using causal_slam::offline_analysis::TimingSummary;
 using causal_slam::offline_analysis::TopicSummary;
 
-struct AnalyzeBagOptions {
-  bool show_help = false;
-  std::string bag_path;
-  std::string lidar_topic;
-  std::string imu_topic;
-  std::string report_path;
-};
-
-
-
-void PrintUsage(std::ostream& out) {
-  out << "Usage:\n"
-      << "  causal_slam_analyze_bag \\\n"
-      << "    --bag <path> \\\n"
-      << "    --lidar-topic <topic> \\\n"
-      << "    --imu-topic <topic> \\\n"
-      << "    --report <path>\n"
-      << "\n"
-      << "Options:\n"
-      << "  --bag <path>           Path to rosbag2 directory\n"
-      << "  --lidar-topic <topic>  LiDAR PointCloud2 topic\n"
-      << "  --imu-topic <topic>    IMU topic\n"
-      << "  --report <path>        Output JSON report path\n"
-      << "  -h, --help             Show this help message\n";
-}
-
-bool IsHelpArg(std::string_view arg) {
-  return arg == "--help" || arg == "-h";
-}
-
-bool IsOptionArg(std::string_view arg) {
-  return arg == "--bag" || arg == "--lidar-topic" || arg == "--imu-topic" || arg == "--report";
-}
-
-std::optional<std::string> RequireValue(int argc, char** argv, int index, std::string_view option, std::ostream& err) {
-  const int value_index = index + 1;
-  if (value_index >= argc) {
-    err << "Missing value for " << option << ".\n";
-    return std::nullopt;
-  }
-
-  const std::string_view value{argv[value_index]};
-  if (value.empty() || value.starts_with("--")) {
-    err << "Missing value for " << option << ".\n";
-    return std::nullopt;
-  }
-
-  return std::string{value};
-}
-
-std::optional<AnalyzeBagOptions> ParseArgs(int argc, char** argv, std::ostream& err) {
-  AnalyzeBagOptions options;
-
-  if (argc == 2 && IsHelpArg(argv[1])) {
-    options.show_help = true;
-    return options;
-  }
-
-  for (int i = 1; i < argc; ++i) {
-    const std::string_view arg{argv[i]};
-
-    if (IsHelpArg(arg)) {
-      options.show_help = true;
-      return options;
-    }
-
-    if (!IsOptionArg(arg)) {
-      err << "Unknown argument: " << arg << ".\n";
-      return std::nullopt;
-    }
-
-    const auto value = RequireValue(argc, argv, i, arg, err);
-    if (!value.has_value()) {
-      return std::nullopt;
-    }
-
-    if (arg == "--bag") {
-      options.bag_path = *value;
-    } else if (arg == "--lidar-topic") {
-      options.lidar_topic = *value;
-    } else if (arg == "--imu-topic") {
-      options.imu_topic = *value;
-    } else if (arg == "--report") {
-      options.report_path = *value;
-    }
-
-    ++i;
-  }
-
-  bool valid = true;
-  if (options.bag_path.empty()) {
-    err << "Missing required argument: --bag <path>.\n";
-    valid = false;
-  }
-  if (options.lidar_topic.empty()) {
-    err << "Missing required argument: --lidar-topic <topic>.\n";
-    valid = false;
-  }
-  if (options.imu_topic.empty()) {
-    err << "Missing required argument: --imu-topic <topic>.\n";
-    valid = false;
-  }
-  if (options.report_path.empty()) {
-    err << "Missing required argument: --report <path>.\n";
-    valid = false;
-  }
-
-  if (!valid) {
-    return std::nullopt;
-  }
-
-  return options;
-}
-
-
-
-
 std::int64_t ToNanoseconds(const builtin_interfaces::msg::Time& stamp) {
-  return static_cast<std::int64_t>(stamp.sec) * 1000000000LL + static_cast<std::int64_t>(stamp.nanosec);
+  return (static_cast<std::int64_t>(stamp.sec) * 1000000000LL) + static_cast<std::int64_t>(stamp.nanosec);
 }
 
 double NsToMs(std::int64_t value_ns) {
   return static_cast<double>(value_ns) / 1.0e6;
 }
-
-
 
 std::string PointFieldDatatypeName(std::uint8_t datatype) {
   switch (datatype) {
@@ -353,7 +235,11 @@ class LidarScanWindowAccumulator {
     summary_.points_total += extraction.point_count_total;
     summary_.points_used += extraction.point_count_used;
 
-    durations_ms_.push_back(causal_slam::core::NanosecondsToMilliseconds(extraction.scan_window.end_ns - extraction.scan_window.start_ns));
+    const double duration_ms =
+        causal_slam::core::NanosecondsToMilliseconds(extraction.scan_window.end_ns - extraction.scan_window.start_ns);
+
+    durations_ms_.push_back(duration_ms);
+    ObservePointTimeDurationOutlier(summary_.scans_total - 1, duration_ms);
   }
 
   void ObserveFallbackEstimate(const causal_slam::lidar::LidarScanWindowEstimate& estimate) {
@@ -399,11 +285,25 @@ class LidarScanWindowAccumulator {
     summary_.duration_min_ms = *min_it;
     summary_.duration_max_ms = *max_it;
     summary_.duration_stddev_ms = static_cast<double>(std::sqrt(variance));
-
+    if (summary_.scans_total > 0) {
+      summary_.duration_outlier_ratio = static_cast<double>(summary_.duration_outlier_count) / static_cast<double>(summary_.scans_total);
+    }
     return summary_;
   }
 
  private:
+  void ObservePointTimeDurationOutlier(std::uint64_t scan_index, double duration_ms) {
+    if (duration_ms <= summary_.duration_outlier_threshold_ms) {
+      return;
+    }
+
+    ++summary_.duration_outlier_count;
+
+    if (duration_ms > summary_.worst_duration_outlier_ms) {
+      summary_.worst_duration_outlier_ms = duration_ms;
+      summary_.worst_duration_outlier_scan_index = scan_index;
+    }
+  }
   LidarScanWindowSummary summary_;
   std::vector<double> durations_ms_;
 };
@@ -577,7 +477,24 @@ DatasetVerdict BuildDatasetVerdict(const BagSummary& summary) {
   const std::uint64_t fault_count = summary.imu_coverage.warning + summary.imu_coverage.degraded + summary.imu_coverage.invalid;
 
   verdict.fault_ratio = static_cast<double>(fault_count) / static_cast<double>(summary.imu_coverage.scans_total);
+  const double lidar_duration_outlier_ratio = summary.lidar_scan_windows.scans_total == 0
+                                                  ? 0.0
+                                                  : static_cast<double>(summary.lidar_scan_windows.duration_outlier_count) /
+                                                        static_cast<double>(summary.lidar_scan_windows.scans_total);
 
+  if (lidar_duration_outlier_ratio >= 0.05) {
+    verdict.health = "DEGRADED";
+    verdict.reason = "lidar_scan_window_duration_outliers";
+    verdict.map_update_recommended = false;
+    return verdict;
+  }
+
+  if (summary.lidar_scan_windows.duration_outlier_count > 0) {
+    verdict.health = "WARNING";
+    verdict.reason = "lidar_scan_window_duration_outliers";
+    verdict.map_update_recommended = true;
+    return verdict;
+  }
   if (summary.imu_coverage.invalid > 0) {
     verdict.health = "INVALID";
     verdict.reason = "invalid_imu_coverage_windows";
@@ -640,28 +557,6 @@ BagSummary BuildSummary(const std::vector<rosbag2_storage::TopicMetadata>& metad
 
   return summary;
 }
-
-
-
-bool WriteReportJson(const AnalyzeBagOptions& options, const BagSummary& summary, std::ostream& err) {
-  std::ofstream report{options.report_path};
-  if (!report) {
-    err << "Failed to open report file for writing: " << options.report_path << "\n";
-    return false;
-  }
-
-  const causal_slam::render::OfflineTemporalReportJsonRenderer renderer;
-  const causal_slam::render::OfflineTemporalReportRenderContext context{
-      .bag_path = options.bag_path,
-      .lidar_topic = options.lidar_topic,
-      .imu_topic = options.imu_topic,
-  };
-
-  report << renderer.Render(context, summary);
-  return true;
-}
-
-
 
 int AnalyzeBag(const AnalyzeBagOptions& options, std::ostream& out, std::ostream& err) {
   try {
@@ -773,18 +668,28 @@ int AnalyzeBag(const AnalyzeBagOptions& options, std::ostream& out, std::ostream
     summary.imu_coverage = BuildOfflineImuCoverageReport(scan_windows_for_coverage, imu_samples);
     summary.verdict = BuildDatasetVerdict(summary);
 
-    if (!WriteReportJson(options, summary, err)) {
+    const causal_slam::render::OfflineTemporalReportArtifactWriter artifact_writer;
+    const causal_slam::render::OfflineTemporalReportArtifactPaths artifact_paths{
+        .json_report_path = options.report_path,
+        .html_report_path = options.html_report_path,
+    };
+    const causal_slam::render::OfflineTemporalReportArtifactContext artifact_context{
+        .bag_path = options.bag_path,
+        .lidar_topic = options.lidar_topic,
+        .imu_topic = options.imu_topic,
+    };
+    if (!artifact_writer.Write(artifact_paths, artifact_context, summary, err)) {
       return 3;
     }
 
     const causal_slam::render::OfflineTemporalReportConsoleRenderer console_renderer;
-  const causal_slam::render::OfflineTemporalReportConsoleRenderContext console_context{
-      .bag_path = options.bag_path,
-      .report_path = options.report_path,
-      .lidar_topic = options.lidar_topic,
-      .imu_topic = options.imu_topic,
-  };
-  out << console_renderer.Render(console_context, summary);
+    const causal_slam::render::OfflineTemporalReportConsoleRenderContext console_context{
+        .bag_path = options.bag_path,
+        .report_path = options.report_path,
+        .lidar_topic = options.lidar_topic,
+        .imu_topic = options.imu_topic,
+    };
+    out << console_renderer.Render(console_context, summary);
     return 0;
   } catch (const std::exception& e) {
     err << "Failed to analyze rosbag2.\n"
@@ -794,10 +699,47 @@ int AnalyzeBag(const AnalyzeBagOptions& options, std::ostream& out, std::ostream
   }
 }
 
+int ListTopics(const AnalyzeBagOptions& options, std::ostream& out, std::ostream& err) {
+  try {
+    rosbag2_cpp::Reader reader;
+    reader.open(options.bag_path);
+
+    const auto topics = reader.get_all_topics_and_types();
+
+    std::map<std::string, std::uint64_t> message_counts;
+    for (const auto& topic : topics) {
+      message_counts[topic.name] = 0;
+    }
+
+    while (reader.has_next()) {
+      const auto message = reader.read_next();
+      ++message_counts[message->topic_name];
+    }
+
+    out << "Bag topics:\n";
+
+    if (topics.empty()) {
+      out << "  none\n";
+      return 0;
+    }
+
+    for (const auto& topic : topics) {
+      out << "  " << topic.name << " " << topic.type << " messages=" << message_counts[topic.name] << "\n";
+    }
+
+    return 0;
+  } catch (const std::exception& e) {
+    err << "Failed to list rosbag2 topics.\n"
+        << "  bag: " << options.bag_path << "\n"
+        << "  error: " << e.what() << "\n";
+    return 2;
+  }
+}
+
 }  // namespace
 
 int causal_slam::apps::ros2::RunAnalyzeBagCli(int argc, char** argv, std::ostream& out, std::ostream& err) {
-  const auto options = ParseArgs(argc, argv, err);
+  const auto options = ParseAnalyzeBagArgs(argc, argv, err);
   if (!options) {
     return 2;
   }
@@ -805,6 +747,10 @@ int causal_slam::apps::ros2::RunAnalyzeBagCli(int argc, char** argv, std::ostrea
   if (options->show_help) {
     PrintUsage(out);
     return 0;
+  }
+
+  if (options->list_topics) {
+    return ListTopics(*options, out, err);
   }
 
   return AnalyzeBag(*options, out, err);

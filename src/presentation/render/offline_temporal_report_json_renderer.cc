@@ -12,7 +12,6 @@ namespace {
 
 using causal_slam::offline_analysis::TimingSummary;
 
-
 double NsToMs(std::int64_t ns) {
   return static_cast<double>(ns) / 1'000'000.0;
 }
@@ -45,8 +44,7 @@ std::string JsonEscape(std::string_view value) {
         break;
       default:
         if (static_cast<unsigned char>(ch) < 0x20) {
-          escaped << "\\u" << std::hex << std::setw(4) << std::setfill('0')
-                  << static_cast<int>(static_cast<unsigned char>(ch));
+          escaped << "\\u" << std::hex << std::setw(4) << std::setfill('0') << static_cast<int>(static_cast<unsigned char>(ch));
         } else {
           escaped << ch;
         }
@@ -92,7 +90,6 @@ void WriteTimingJson(std::ostream& report, const TimingSummary& timing) {
 std::string OfflineTemporalReportJsonRenderer::Render(const OfflineTemporalReportRenderContext& context,
                                                       const causal_slam::offline_analysis::OfflineTemporalReport& summary) const {
   std::ostringstream report;
-
 
   report << "{\n";
   report << "  \"tool\": \"causal_slam_analyze_bag\",\n";
@@ -215,6 +212,11 @@ std::string OfflineTemporalReportJsonRenderer::Render(const OfflineTemporalRepor
   report << "    \"duration_stddev_ms\": ";
   WriteNullableDouble(report, windows.has_duration, windows.duration_stddev_ms);
   report << ",\n";
+  report << "    \"duration_outlier_count\": " << windows.duration_outlier_count << ",\n";
+  report << "    \"duration_outlier_ratio\": " << windows.duration_outlier_ratio << ",\n";
+  report << "    \"duration_outlier_threshold_ms\": " << windows.duration_outlier_threshold_ms << ",\n";
+  report << "    \"worst_duration_outlier_scan_index\": " << windows.worst_duration_outlier_scan_index << ",\n";
+  report << "    \"worst_duration_outlier_ms\": " << windows.worst_duration_outlier_ms << ",\n";
   report << "    \"source\": ";
   WriteJsonString(report, windows.source);
   report << ",\n";
@@ -300,7 +302,6 @@ std::string OfflineTemporalReportJsonRenderer::Render(const OfflineTemporalRepor
   report << "}\n";
 
   return report.str();
-
 }
 
 }  // namespace causal_slam::render

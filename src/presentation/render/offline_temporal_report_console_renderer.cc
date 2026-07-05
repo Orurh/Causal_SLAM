@@ -4,9 +4,8 @@
 
 namespace causal_slam::render {
 
-std::string OfflineTemporalReportConsoleRenderer::Render(
-    const OfflineTemporalReportConsoleRenderContext& context,
-    const causal_slam::offline_analysis::OfflineTemporalReport& summary) const {
+std::string OfflineTemporalReportConsoleRenderer::Render(const OfflineTemporalReportConsoleRenderContext& context,
+                                                         const causal_slam::offline_analysis::OfflineTemporalReport& summary) const {
   std::ostringstream out;
 
   out << "Bag analyzed successfully.\n";
@@ -70,6 +69,13 @@ std::string OfflineTemporalReportConsoleRenderer::Render(
   out << "  duration_mean_ms=" << summary.lidar_scan_windows.duration_mean_ms << "\n";
   out << "  duration_min_ms=" << summary.lidar_scan_windows.duration_min_ms << "\n";
   out << "  duration_max_ms=" << summary.lidar_scan_windows.duration_max_ms << "\n";
+  if (summary.lidar_scan_windows.duration_outlier_count > 0) {
+    out << "  duration_outlier_count=" << summary.lidar_scan_windows.duration_outlier_count << "\n";
+    out << "  duration_outlier_ratio=" << summary.lidar_scan_windows.duration_outlier_ratio << "\n";
+    out << "  duration_outlier_threshold_ms=" << summary.lidar_scan_windows.duration_outlier_threshold_ms << "\n";
+    out << "  worst_duration_outlier_scan_index=" << summary.lidar_scan_windows.worst_duration_outlier_scan_index << "\n";
+    out << "  worst_duration_outlier_ms=" << summary.lidar_scan_windows.worst_duration_outlier_ms << "\n";
+  }
   out << "  source=" << summary.lidar_scan_windows.source << "\n";
   out << "  confidence=" << summary.lidar_scan_windows.confidence << "\n";
   out << "  time_unit=" << summary.lidar_scan_windows.time_unit << "\n";

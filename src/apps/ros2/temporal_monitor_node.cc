@@ -514,8 +514,7 @@ causal_slam::statistics::CloudForwardingDecision TemporalMonitorNode::MaybePubli
 }
 
 void TemporalMonitorNode::PublishDiagnosticTopics(const diagnostics::TemporalDiagnosticSnapshot& snapshot,
-                                                  const policy::MapUpdateDecision& map_update_decision,
-                                                  bool publish_decision_json) {
+                                                  const policy::MapUpdateDecision& map_update_decision, bool publish_decision_json) {
   BoolMsg map_update_allowed_msg;
   map_update_allowed_msg.data = map_update_decision.map_update_allowed;
   map_update_allowed_publisher_->publish(map_update_allowed_msg);

@@ -15,9 +15,8 @@ struct OfflineTemporalReportConsoleRenderContext {
 
 class OfflineTemporalReportConsoleRenderer final {
  public:
-  [[nodiscard]] std::string Render(
-      const OfflineTemporalReportConsoleRenderContext& context,
-      const causal_slam::offline_analysis::OfflineTemporalReport& summary) const;
+  [[nodiscard]] std::string Render(const OfflineTemporalReportConsoleRenderContext& context,
+                                   const causal_slam::offline_analysis::OfflineTemporalReport& summary) const;
 };
 
 }  // namespace causal_slam::render

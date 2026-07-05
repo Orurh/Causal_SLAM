@@ -27,10 +27,7 @@ ReportSection MakeSection(std::string id, std::string title, std::string empty_m
   return section;
 }
 
-ReportRow MakeRow(std::string label,
-                  std::string status = {},
-                  std::vector<ReportMetric> metrics = {},
-                  std::string reason = {},
+ReportRow MakeRow(std::string label, std::string status = {}, std::vector<ReportMetric> metrics = {}, std::string reason = {},
                   std::string detail = {}) {
   ReportRow row;
   row.label = std::move(label);
@@ -63,26 +60,20 @@ ReportSection BuildVerdictSection(const causal_slam::offline_analysis::OfflineTe
 ReportSection BuildSelectedTopicsSection(const causal_slam::offline_analysis::OfflineTemporalReport& report) {
   auto section = MakeSection("selected_topics", "Selected topics");
 
-  section.rows.push_back(MakeRow(
-      "lidar",
-      report.lidar_topic_found ? "found" : "missing",
-      {
-          Metric("messages", ToReportString(report.lidar_messages)),
-      }));
+  section.rows.push_back(MakeRow("lidar", report.lidar_topic_found ? "found" : "missing",
+                                 {
+                                     Metric("messages", ToReportString(report.lidar_messages)),
+                                 }));
 
-  section.rows.push_back(MakeRow(
-      "imu",
-      report.imu_topic_found ? "found" : "missing",
-      {
-          Metric("messages", ToReportString(report.imu_messages)),
-      }));
+  section.rows.push_back(MakeRow("imu", report.imu_topic_found ? "found" : "missing",
+                                 {
+                                     Metric("messages", ToReportString(report.imu_messages)),
+                                 }));
 
   return section;
 }
 
-ReportSection BuildTimingSection(std::string id,
-                                 std::string title,
-                                 const causal_slam::offline_analysis::TimingSummary& timing) {
+ReportSection BuildTimingSection(std::string id, std::string title, const causal_slam::offline_analysis::TimingSummary& timing) {
   auto section = MakeSection(std::move(id), std::move(title));
 
   section.metrics.push_back(Metric("deserialized_messages", ToReportString(timing.deserialized_messages)));
@@ -125,6 +116,13 @@ ReportSection BuildLidarScanWindowsSection(const causal_slam::offline_analysis::
   section.metrics.push_back(Metric("duration_mean_ms", NullableDoubleString(windows.has_duration, windows.duration_mean_ms)));
   section.metrics.push_back(Metric("duration_min_ms", NullableDoubleString(windows.has_duration, windows.duration_min_ms)));
   section.metrics.push_back(Metric("duration_max_ms", NullableDoubleString(windows.has_duration, windows.duration_max_ms)));
+  if (windows.duration_outlier_count > 0) {
+    section.metrics.push_back(Metric("duration_outlier_count", ToReportString(windows.duration_outlier_count)));
+    section.metrics.push_back(Metric("duration_outlier_ratio", ToReportString(windows.duration_outlier_ratio)));
+    section.metrics.push_back(Metric("duration_outlier_threshold_ms", ToReportString(windows.duration_outlier_threshold_ms)));
+    section.metrics.push_back(Metric("worst_duration_outlier_scan_index", ToReportString(windows.worst_duration_outlier_scan_index)));
+    section.metrics.push_back(Metric("worst_duration_outlier_ms", ToReportString(windows.worst_duration_outlier_ms)));
+  }
   section.metrics.push_back(Metric("source", windows.source));
   section.metrics.push_back(Metric("confidence", windows.confidence));
   section.metrics.push_back(Metric("time_unit", windows.time_unit));
@@ -178,12 +176,10 @@ ReportSection BuildFaultReasonsSection(const causal_slam::offline_analysis::Offl
   auto section = MakeSection("fault_reasons", "Fault reasons", "no faults");
 
   for (const auto& [reason, count] : report.imu_coverage.fault_reasons) {
-    section.rows.push_back(MakeRow(
-        reason,
-        "fault",
-        {
-            Metric("count", ToReportString(count)),
-        }));
+    section.rows.push_back(MakeRow(reason, "fault",
+                                   {
+                                       Metric("count", ToReportString(count)),
+                                   }));
   }
 
   return section;
@@ -193,12 +189,10 @@ ReportSection BuildTopicsSection(const causal_slam::offline_analysis::OfflineTem
   auto section = MakeSection("topics", "Bag topics", "no topics");
 
   for (const auto& topic : report.topics) {
-    section.rows.push_back(MakeRow(
-        topic.name,
-        topic.type,
-        {
-            Metric("messages", ToReportString(topic.message_count)),
-        }));
+    section.rows.push_back(MakeRow(topic.name, topic.type,
+                                   {
+                                       Metric("messages", ToReportString(topic.message_count)),
+                                   }));
   }
 
   return section;
@@ -206,8 +200,7 @@ ReportSection BuildTopicsSection(const causal_slam::offline_analysis::OfflineTem
 
 }  // namespace
 
-ReportDocument OfflineTemporalReportDocumentBuilder::Build(
-    const causal_slam::offline_analysis::OfflineTemporalReport& report) const {
+ReportDocument OfflineTemporalReportDocumentBuilder::Build(const causal_slam::offline_analysis::OfflineTemporalReport& report) const {
   ReportDocument document;
   document.title = "Offline temporal report";
 

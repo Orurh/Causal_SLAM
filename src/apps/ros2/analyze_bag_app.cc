@@ -1,5 +1,7 @@
 #include "apps/ros2/analyze_bag_app.h"
 
+#include "application/offline_analysis/offline_stream_timing_fault_analyzer.h"
+
 #include "apps/ros2/analyze_bag_cli.h"
 
 #include <algorithm>
@@ -33,6 +35,7 @@ namespace {
 
 using causal_slam::apps::ros2::AnalyzeBagOptions;
 using causal_slam::offline_analysis::BagSummary;
+using causal_slam::offline_analysis::BuildStreamTimingFaultReport;
 using causal_slam::offline_analysis::DatasetVerdict;
 using causal_slam::offline_analysis::LidarFirstCloudSummary;
 using causal_slam::offline_analysis::LidarScanWindowSummary;
@@ -482,6 +485,8 @@ DatasetVerdict BuildDatasetVerdict(const BagSummary& summary) {
                                                   : static_cast<double>(summary.lidar_scan_windows.duration_outlier_count) /
                                                         static_cast<double>(summary.lidar_scan_windows.scans_total);
 
+  const bool has_stream_timing_faults = !summary.stream_timing_faults.fault_reasons.empty();
+
   if (lidar_duration_outlier_ratio >= 0.05) {
     verdict.health = "DEGRADED";
     verdict.reason = "lidar_scan_window_duration_outliers";
@@ -511,7 +516,15 @@ DatasetVerdict BuildDatasetVerdict(const BagSummary& summary) {
 
   if (fault_count > 0) {
     verdict.health = "WARNING";
-    verdict.reason = "isolated_imu_coverage_faults";
+    verdict.reason =
+        has_stream_timing_faults ? "lidar_stream_timing_warning_with_isolated_imu_coverage_faults" : "isolated_imu_coverage_faults";
+    verdict.map_update_recommended = true;
+    return verdict;
+  }
+
+  if (has_stream_timing_faults) {
+    verdict.health = "WARNING";
+    verdict.reason = "lidar_stream_timing_warning";
     verdict.map_update_recommended = true;
     return verdict;
   }
@@ -666,6 +679,7 @@ int AnalyzeBag(const AnalyzeBagOptions& options, std::ostream& out, std::ostream
     summary.lidar_first_cloud = std::move(first_cloud);
     summary.lidar_scan_windows = lidar_scan_windows.Finish();
     summary.imu_coverage = BuildOfflineImuCoverageReport(scan_windows_for_coverage, imu_samples);
+    summary.stream_timing_faults = BuildStreamTimingFaultReport(summary);
     summary.verdict = BuildDatasetVerdict(summary);
 
     const causal_slam::render::OfflineTemporalReportArtifactWriter artifact_writer;

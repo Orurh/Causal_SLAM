@@ -49,6 +49,11 @@ TEST(OfflineTemporalReportDocumentBuilderTest, BuildsCoreSections) {
   report.lidar_scan_windows.confidence = "MEDIUM";
   report.lidar_scan_windows.time_unit = "none";
 
+  report.stream_timing_faults.lidar_stream_timing_jitter_high = true;
+  report.stream_timing_faults.lidar_stream_timing_short_period = true;
+  report.stream_timing_faults.fault_reasons["lidar_stream_timing_jitter_high"] = 1;
+  report.stream_timing_faults.fault_reasons["lidar_stream_timing_short_period"] = 1;
+
   report.topics.push_back(causal_slam::offline_analysis::TopicSummary{
       .name = "/imu",
       .type = "sensor_msgs/msg/Imu",
@@ -71,6 +76,16 @@ TEST(OfflineTemporalReportDocumentBuilderTest, BuildsCoreSections) {
   ASSERT_NE(coverage, nullptr);
   ASSERT_NE(FindMetric(*coverage, "internal_gap_count"), nullptr);
   EXPECT_EQ(FindMetric(*coverage, "internal_gap_count")->value, "124");
+
+  const ReportSection* stream_faults = FindSection(document, "stream_timing_faults");
+  ASSERT_NE(stream_faults, nullptr);
+  ASSERT_NE(FindMetric(*stream_faults, "lidar_stream_timing_jitter_high"), nullptr);
+  EXPECT_EQ(FindMetric(*stream_faults, "lidar_stream_timing_jitter_high")->value, "true");
+  ASSERT_NE(FindMetric(*stream_faults, "lidar_stream_timing_short_period"), nullptr);
+  EXPECT_EQ(FindMetric(*stream_faults, "lidar_stream_timing_short_period")->value, "true");
+  ASSERT_EQ(stream_faults->rows.size(), 2U);
+  EXPECT_EQ(stream_faults->rows[0].label, "lidar_stream_timing_jitter_high");
+  EXPECT_EQ(stream_faults->rows[1].label, "lidar_stream_timing_short_period");
 
   const ReportSection* faults = FindSection(document, "fault_reasons");
   ASSERT_NE(faults, nullptr);

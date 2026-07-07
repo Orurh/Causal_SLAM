@@ -1,133 +1,197 @@
 # Causal-SLAM
 
-Causal-SLAM is a small ROS 2 / C++ tool for checking temporal integrity in LiDAR/IMU SLAM pipelines.
+Causal-SLAM is a ROS 2 / C++ temporal integrity layer for LiDAR/IMU SLAM/LIO pipelines.
 
-Idea: before trusting SLAM geometry, first check that sensor data is temporally valid.
+Core idea: **before trusting SLAM geometry, verify that sensor measurements were temporally valid to fuse.**
 
-This is not a new SLAM algorithm. It is a temporal monitor / guard that checks LiDAR, IMU and TF timing and reports whether map updates are safe.
+It is not a new SLAM estimator, not a FAST-LIO/LIO-SAM replacement, and not a GUI. It is a temporal monitor / guard in front of SLAM.
 
-## Supported version
+## What it does now
 
-Tested with:
+Causal-SLAM checks:
 
-- Ubuntu 24.04
-- ROS 2 Jazzy
-- C++20
-- CMake 3.28+
+- LiDAR/IMU stream timing stability;
+- IMU coverage over the LiDAR scan window;
+- `PointCloud2` time-field availability and safety;
+- TF lookup / stale / future transforms;
+- whether map update should be allowed.
 
-ROS 1 support exists only as an experimental compatibility adapter.
+Main output topics:
+
+```text
+/causal_slam/map_update_allowed
+/causal_slam/temporal_health
+/causal_slam/map_update_reason
+/causal_slam/fault_reasons
+/causal_slam/map_update_decision_json
+/causal_slam/checked_lidar
+```
+
+## What it does not do yet
+
+Causal-SLAM does not yet:
+
+- correct timestamps;
+- perform deskew correction;
+- build maps;
+- replace a SLAM estimator;
+- guarantee visual improvement unless the downstream SLAM pipeline consumes `/causal_slam/checked_lidar`.
 
 ## Build
 
-    source /opt/ros/jazzy/setup.bash
+```bash
+source /opt/ros/jazzy/setup.bash
 
-    mkdir -p ~/causal_slam_ws/src
-    cd ~/causal_slam_ws/src
-    git clone <repo-url> causal_slam
+mkdir -p ~/causal_slam_ws/src
+cd ~/causal_slam_ws/src
+git clone <repo-url> causal_slam
 
-    cd ~/causal_slam_ws
-    colcon build --packages-select causal_slam
-    source install/setup.bash
+cd ~/causal_slam_ws
+colcon build --packages-select causal_slam
+source install/setup.bash
+```
 
-Or with Makefile:
+Or from the repository:
 
-    make build
+```bash
+make build
+```
 
-## Run tests
+## Online run
 
-    make test
+```bash
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
 
-Run smoke scenarios:
+ros2 run causal_slam temporal_monitor_node --ros-args \
+  --params-file src/causal_slam/config/temporal_gate.yaml
+```
 
-    make smoke
+From the repository root:
 
-## Run
+```bash
+ros2 run causal_slam temporal_monitor_node --ros-args \
+  --params-file config/temporal_gate.yaml
+```
 
-    source /opt/ros/jazzy/setup.bash
-    source install/setup.bash
+Main config:
 
-    ros2 run causal_slam temporal_monitor_node --ros-args \
-      --params-file src/causal_slam/config/temporal_gate.yaml
+```text
+config/temporal_gate.yaml
+```
 
-If you run from inside the repository:
-
-    ros2 run causal_slam temporal_monitor_node --ros-args \
-      --params-file config/temporal_gate.yaml
-
-## Configuration
-
-Main config file:
-
-    config/temporal_gate.yaml
-
-Input and output topics, gate mode, IMU thresholds, LiDAR scan settings, TF monitoring and HTML report path are configured there.
-
-## Main output topics
-
-    /causal_slam/map_update_allowed
-    /causal_slam/temporal_health
-    /causal_slam/map_update_reason
-    /causal_slam/fault_reasons
-    /causal_slam/map_update_decision_json
-    /causal_slam/checked_lidar
+It controls input topics, output topics, gate mode, IMU thresholds, LiDAR scan window settings, and TF monitoring.
 
 ## Gate modes
 
-    observe
-    drop_invalid
-    drop_degraded
-    strict
+```text
+observe        diagnostics only
+drop_invalid   block invalid states
+drop_degraded  block degraded and invalid states
+strict         forward only fully healthy data
+```
 
-Meaning:
+To use the gate with SLAM, feed the downstream SLAM pipeline from:
 
-- observe: only report diagnostics
-- drop_invalid: block invalid temporal states
-- drop_degraded: block degraded and invalid states
-- strict: forward only fully healthy data
+```text
+/causal_slam/checked_lidar
+```
 
-## What it checks
+instead of the raw LiDAR topic.
 
-- LiDAR stream timing
-- IMU stream timing
-- IMU coverage over LiDAR scan window
-- delayed or unstable timestamps
-- PointCloud2 time-field diagnostics
-- TF lookup failures
-- stale or future TF transforms
-- map update allow/block decision
+## Offline rosbag analysis
 
-## Output meaning
+Offline mode is a reproducible evidence harness for datasets.
+
+```bash
+ros2 run causal_slam causal_slam_analyze_bag \
+  --bag /path/to/rosbag2 \
+  --lidar-topic /ouster/points \
+  --imu-topic /ouster/imu \
+  --report /tmp/causal_slam_report.json \
+  --html-report /tmp/causal_slam_report.html
+```
+
+Expected output:
+
+- console summary;
+- JSON report;
+- optional HTML report.
+
+Important JSON fields:
+
+```text
+verdict.health
+verdict.reason
+point_cloud2_capability
+lidar_scan_windows
+imu_coverage
+stream_timing_faults
+```
+
+## How to read the result
 
 Health:
 
-    OK
-    WARNING
-    DEGRADED
-    INVALID
+```text
+OK        temporal evidence is healthy
+WARNING   suspicious but not critical
+DEGRADED  unsafe for map update
+INVALID   insufficient data or invalid state
+```
 
 Map update:
 
-    true  -> timing evidence is acceptable
-    false -> timing evidence is degraded or invalid
+```text
+true   acceptable for map update
+false  temporal evidence is degraded/invalid
+```
 
 Example fault reasons:
 
-    stream_timing_unstable
-    imu_window_incomplete
-    lidar_point_time_unsupported
-    lidar_point_time_extraction_failed
-    lidar_scan_window_low_confidence
-    tf_lookup_failed
-    tf_extrapolation_required
-    tf_age_too_high
-    tf_transform_from_future
+```text
+lidar_stream_timing_jitter_high
+lidar_stream_timing_short_period
+lidar_stream_timing_long_period
+imu_stream_timing_jitter_high
+imu_stream_timing_jitter_suspicious
+imu_window_incomplete
+lidar_point_time_unsupported
+lidar_point_time_extraction_failed
+lidar_scan_window_low_confidence
+tf_lookup_failed
+tf_extrapolation_required
+tf_age_too_high
+tf_transform_from_future
+```
+
+## Planned visual validation
+
+The project needs a dataset where temporal faults visibly affect downstream SLAM/LIO.
+
+Validation plan:
+
+```text
+1. Run SLAM on raw LiDAR/IMU.
+2. Run the same SLAM with Causal-SLAM in front.
+3. Feed SLAM from /causal_slam/checked_lidar instead of raw LiDAR.
+4. Compare map/trajectory before and after.
+5. Show a side-by-side GIF.
+```
+
+Expected useful case:
+
+```text
+raw SLAM:
+  map smearing, ghosting, or corrupted map updates
+
+SLAM through Causal-SLAM:
+  degraded/invalid temporal windows are not used for map update
+  map is visually more stable
+```
 
 ## Status
 
 Experimental MVP.
 
-Useful for testing temporal integrity around SLAM/LIO pipelines, but not a production safety system yet.
-
-## License
-
-MIT
+The project is currently useful as a temporal diagnostics/gating layer and offline evidence harness. It is not production safety software yet.

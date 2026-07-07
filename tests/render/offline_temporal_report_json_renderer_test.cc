@@ -27,6 +27,11 @@ TEST(OfflineTemporalReportJsonRendererTest, RendersTopLevelSchemaAndVerdict) {
   report.imu_coverage.internal_gap_count = 2;
   report.imu_coverage.fault_reasons["imu_window_missing_prefix"] = 1;
 
+  report.stream_timing_faults.lidar_stream_timing_jitter_high = true;
+  report.stream_timing_faults.lidar_stream_timing_short_period = true;
+  report.stream_timing_faults.fault_reasons["lidar_stream_timing_jitter_high"] = 1;
+  report.stream_timing_faults.fault_reasons["lidar_stream_timing_short_period"] = 1;
+
   const OfflineTemporalReportRenderContext context{
       .bag_path = "/tmp/test_bag",
       .lidar_topic = "/points",
@@ -48,6 +53,14 @@ TEST(OfflineTemporalReportJsonRendererTest, RendersTopLevelSchemaAndVerdict) {
   EXPECT_NE(json.find("\"health\": \"WARNING\""), std::string::npos);
   EXPECT_NE(json.find("\"reason\": \"isolated_imu_coverage_faults\""), std::string::npos);
   EXPECT_NE(json.find("\"map_update_recommended\": true"), std::string::npos);
+
+  EXPECT_NE(json.find("\"point_cloud2_capability\""), std::string::npos);
+  EXPECT_NE(json.find("\"point_cloud2_fields\""), std::string::npos);
+  EXPECT_NE(json.find("\"point_time_supported\""), std::string::npos);
+
+  EXPECT_NE(json.find("\"stream_timing_faults\""), std::string::npos);
+  EXPECT_NE(json.find("\"lidar_stream_timing_jitter_high\": true"), std::string::npos);
+  EXPECT_NE(json.find("\"lidar_stream_timing_short_period\": true"), std::string::npos);
 
   EXPECT_NE(json.find("\"imu_coverage\""), std::string::npos);
   EXPECT_NE(json.find("\"internal_gap_count\": 2"), std::string::npos);

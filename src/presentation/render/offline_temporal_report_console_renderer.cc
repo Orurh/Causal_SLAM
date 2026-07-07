@@ -46,6 +46,16 @@ std::string OfflineTemporalReportConsoleRenderer::Render(const OfflineTemporalRe
   out << "  period_stddev_ms=" << summary.lidar_timing.period_stddev_ms << "\n";
   out << "  reorder_count=" << summary.lidar_timing.reorder_count << "\n";
 
+  out << "Stream timing faults:\n";
+  if (summary.stream_timing_faults.fault_reasons.empty()) {
+    out << "  none\n";
+  } else {
+    for (const auto& [reason, count] : summary.stream_timing_faults.fault_reasons) {
+      out << "  " << reason << "=" << count << "\n";
+    }
+  }
+  out << "\n";
+
   out << "PointCloud2 capabilities:\n";
   out << "  has_xyz="
       << ((summary.lidar_first_cloud.capabilities.has_x && summary.lidar_first_cloud.capabilities.has_y &&

@@ -71,24 +71,29 @@ TemporalDiagnosticSeverity SeverityFromTimingHealth(causal_slam::telemetry::Timi
 }
 
 void AddTimingIssue(const std::string& stream_id, const std::string& stream_name, TemporalFaultReason reason,
-                    const causal_slam::telemetry::TimingSummary& summary, std::vector<TemporalDiagnosticIssue>* issues) {
+                    const causal_slam::telemetry::TimingSummary& summary, TemporalDiagnosticSnapshot* snapshot) {
   if (summary.health == causal_slam::telemetry::TimingHealth::kOk) {
     return;
   }
 
-  issues->push_back(TemporalDiagnosticIssue{
+  TemporalDiagnosticIssue issue{
       .severity = SeverityFromTimingHealth(summary.health),
       .reason = reason,
       .title = stream_name + " stream timing is not stable",
-      .explanation = "The message stream has temporal instability in the latest summary "
-                     "window.",
+      .explanation =
+          "The message stream has temporal instability in the latest summary "
+          "window.",
       .evidence = "stream=" + stream_id + ", reason=" + summary.reason + ", window_count=" + std::to_string(summary.window_count) +
                   ", last_period_ms=" + std::to_string(summary.last_period_ms) + ", window_max_jitter_ms=" +
                   std::to_string(summary.window_max_jitter_ms) + ", window_gap_count=" + std::to_string(summary.window_gap_count) +
                   ", window_reordered_count=" + std::to_string(summary.window_reordered_count),
-      .suggested_action = "Check sensor driver timing, QoS, CPU load, transport latency, and "
-                          "timestamp source.",
-  });
+      .suggested_action =
+          "Check sensor driver timing, QoS, CPU load, transport latency, and "
+          "timestamp source.",
+  };
+
+  snapshot->overall_status = MaxStatus(snapshot->overall_status, StatusFromSeverity(issue.severity));
+  snapshot->issues.push_back(std::move(issue));
 }
 
 TemporalFaultReason FaultReasonFromTransformStatus(causal_slam::transform::TransformLookupStatus status) {
@@ -178,7 +183,47 @@ void AddTransformIssue(const causal_slam::transform::TransformAgeSummary& summar
       snapshot);
 }
 
-TemporalFaultReason StreamTimingFaultReason(causal_slam::telemetry::TemporalStreamId stream_id) {
+TemporalFaultReason StreamTimingFaultReason(causal_slam::telemetry::TemporalStreamId stream_id,
+                                            const causal_slam::telemetry::TimingSummary& summary) {
+  const bool is_imu = stream_id == causal_slam::telemetry::TemporalStreamId::kImu;
+  const bool is_lidar = stream_id == causal_slam::telemetry::TemporalStreamId::kLidar;
+
+  if (summary.reason == "jitter_high") {
+    if (is_imu) {
+      return TemporalFaultReason::kImuStreamTimingJitterHigh;
+    }
+    if (is_lidar) {
+      return TemporalFaultReason::kLidarStreamTimingJitterHigh;
+    }
+  }
+
+  if (summary.reason == "jitter_suspicious") {
+    if (is_imu) {
+      return TemporalFaultReason::kImuStreamTimingJitterSuspicious;
+    }
+    if (is_lidar) {
+      return TemporalFaultReason::kLidarStreamTimingJitterSuspicious;
+    }
+  }
+
+  if (summary.reason == "stream_gap") {
+    if (is_imu) {
+      return TemporalFaultReason::kImuStreamTimingGap;
+    }
+    if (is_lidar) {
+      return TemporalFaultReason::kLidarStreamTimingGap;
+    }
+  }
+
+  if (summary.reason == "message_reordering_detected") {
+    if (is_imu) {
+      return TemporalFaultReason::kImuStreamTimingReordered;
+    }
+    if (is_lidar) {
+      return TemporalFaultReason::kLidarStreamTimingReordered;
+    }
+  }
+
   switch (stream_id) {
     case causal_slam::telemetry::TemporalStreamId::kImu:
       return TemporalFaultReason::kImuStreamTimingUnstable;
@@ -250,6 +295,22 @@ const char* ToString(TemporalFaultReason reason) {
       return "imu_stream_timing_unstable";
     case TemporalFaultReason::kLidarStreamTimingUnstable:
       return "lidar_stream_timing_unstable";
+    case TemporalFaultReason::kImuStreamTimingJitterSuspicious:
+      return "imu_stream_timing_jitter_suspicious";
+    case TemporalFaultReason::kLidarStreamTimingJitterSuspicious:
+      return "lidar_stream_timing_jitter_suspicious";
+    case TemporalFaultReason::kImuStreamTimingJitterHigh:
+      return "imu_stream_timing_jitter_high";
+    case TemporalFaultReason::kLidarStreamTimingJitterHigh:
+      return "lidar_stream_timing_jitter_high";
+    case TemporalFaultReason::kImuStreamTimingGap:
+      return "imu_stream_timing_gap";
+    case TemporalFaultReason::kLidarStreamTimingGap:
+      return "lidar_stream_timing_gap";
+    case TemporalFaultReason::kImuStreamTimingReordered:
+      return "imu_stream_timing_reordered";
+    case TemporalFaultReason::kLidarStreamTimingReordered:
+      return "lidar_stream_timing_reordered";
     case TemporalFaultReason::kNoLidarScanReceivedYet:
       return "no_lidar_scan_received_yet";
     case TemporalFaultReason::kImuWindowIncomplete:
@@ -288,7 +349,7 @@ TemporalDiagnosticSnapshot TemporalDiagnosticsBuilder::Build(const causal_slam::
 
   for (const auto& stream : observation.streams) {
     AddTimingIssue(std::string{causal_slam::telemetry::ToString(stream.id)}, StreamDisplayName(stream.id),
-                   StreamTimingFaultReason(stream.id), stream.timing, &snapshot.issues);
+                   StreamTimingFaultReason(stream.id, stream.timing), stream.timing, &snapshot);
   }
 
   if (!observation.imu_coverage.has_value()) {

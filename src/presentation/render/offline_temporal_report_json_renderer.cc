@@ -133,6 +133,28 @@ std::string OfflineTemporalReportJsonRenderer::Render(const OfflineTemporalRepor
   WriteTimingJson(report, summary.lidar_timing);
   report << "  },\n";
 
+  const auto& stream_timing = summary.stream_timing_faults;
+  report << "  \"stream_timing_faults\": {\n";
+  report << "    \"lidar_stream_timing_jitter_high\": " << (stream_timing.lidar_stream_timing_jitter_high ? "true" : "false") << ",\n";
+  report << "    \"lidar_stream_timing_short_period\": " << (stream_timing.lidar_stream_timing_short_period ? "true" : "false") << ",\n";
+  report << "    \"lidar_stream_timing_long_period\": " << (stream_timing.lidar_stream_timing_long_period ? "true" : "false") << ",\n";
+  report << "    \"lidar_period_jitter_threshold_ms\": " << stream_timing.lidar_period_jitter_threshold_ms << ",\n";
+  report << "    \"lidar_period_short_threshold_ratio\": " << stream_timing.lidar_period_short_threshold_ratio << ",\n";
+  report << "    \"lidar_period_long_threshold_ratio\": " << stream_timing.lidar_period_long_threshold_ratio << ",\n";
+  report << "    \"fault_reasons\": {\n";
+  std::size_t stream_fault_index = 0;
+  for (const auto& [reason, count] : stream_timing.fault_reasons) {
+    report << "      ";
+    WriteJsonString(report, reason);
+    report << ": " << count;
+    if (++stream_fault_index < stream_timing.fault_reasons.size()) {
+      report << ",";
+    }
+    report << "\n";
+  }
+  report << "    }\n";
+  report << "  },\n";
+
   report << "  \"lidar_first_cloud\": {\n";
   report << "    \"observed\": " << (summary.lidar_first_cloud.observed ? "true" : "false") << ",\n";
   report << "    \"frame_id\": ";
@@ -147,7 +169,7 @@ std::string OfflineTemporalReportJsonRenderer::Render(const OfflineTemporalRepor
   report << "  },\n";
 
   const auto& caps = summary.lidar_first_cloud.capabilities;
-  report << "  \"pointcloud_capabilities\": {\n";
+  report << "  \"point_cloud2_capability\": {\n";
   report << "    \"has_x\": " << (caps.has_x ? "true" : "false") << ",\n";
   report << "    \"has_y\": " << (caps.has_y ? "true" : "false") << ",\n";
   report << "    \"has_z\": " << (caps.has_z ? "true" : "false") << ",\n";
@@ -171,7 +193,7 @@ std::string OfflineTemporalReportJsonRenderer::Render(const OfflineTemporalRepor
   report << "\n";
   report << "  },\n";
 
-  report << "  \"pointcloud_fields\": [\n";
+  report << "  \"point_cloud2_fields\": [\n";
   for (std::size_t i = 0; i < summary.lidar_first_cloud.fields.size(); ++i) {
     const auto& field = summary.lidar_first_cloud.fields[i];
     report << "    {\n";

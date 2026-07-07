@@ -46,6 +46,7 @@ causal_slam_add_gtests_from_dir(tests/policy causal_slam_domain)
 
 causal_slam_add_gtests_from_dir(tests/config causal_slam_application)
 causal_slam_add_gtests_from_dir(tests/pipeline causal_slam_application)
+causal_slam_add_gtests_from_dir(tests/offline_analysis causal_slam_application)
 
 causal_slam_add_gtests_from_dir(tests/report causal_slam_presentation)
 causal_slam_add_gtests_from_dir(tests/render causal_slam_presentation)

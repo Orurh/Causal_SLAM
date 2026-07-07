@@ -41,6 +41,36 @@ TEST(MapUpdateDecisionJsonRendererTest, RendersScanScopedDecision) {
   EXPECT_NE(json.find("missing_prefix_ms=12"), std::string::npos);
 }
 
+TEST(MapUpdateDecisionJsonRendererTest, RendersStreamTimingFaultReason) {
+  causal_slam::diagnostics::TemporalDiagnosticSnapshot snapshot;
+  snapshot.overall_status = causal_slam::telemetry::TemporalHealthStatus::kDegraded;
+  snapshot.observation.has_lidar_scan = true;
+  snapshot.observation.latest_lidar_header_stamp_ns = 987654321;
+  snapshot.observation.latest_lidar_frame_id = "os1_lidar";
+
+  snapshot.issues.push_back(causal_slam::diagnostics::TemporalDiagnosticIssue{
+      .severity = causal_slam::diagnostics::TemporalDiagnosticSeverity::kDegraded,
+      .reason = causal_slam::diagnostics::TemporalFaultReason::kLidarStreamTimingJitterHigh,
+      .title = "LiDAR stream timing is not stable",
+      .explanation = "The LiDAR message stream has high timing jitter.",
+      .evidence = "stream=lidar, reason=jitter_high, window_max_jitter_ms=12.5",
+      .suggested_action = "Check sensor driver timing and timestamp source.",
+  });
+
+  const causal_slam::policy::MapUpdateDecision map_update_decision{
+      .map_update_allowed = false,
+      .reason = causal_slam::policy::MapUpdateDecisionReason::kTemporalHealthDegraded,
+  };
+
+  const auto json = RenderMapUpdateDecisionJson(snapshot, map_update_decision);
+
+  EXPECT_NE(json.find("\"allowed\":false"), std::string::npos);
+  EXPECT_NE(json.find("\"health\":\"DEGRADED\""), std::string::npos);
+  EXPECT_NE(json.find("\"fault_reasons\":[\"lidar_stream_timing_jitter_high\"]"), std::string::npos);
+  EXPECT_NE(json.find("reason=jitter_high"), std::string::npos);
+  EXPECT_NE(json.find("window_max_jitter_ms=12.5"), std::string::npos);
+}
+
 TEST(MapUpdateDecisionJsonRendererTest, EscapesStrings) {
   causal_slam::diagnostics::TemporalDiagnosticSnapshot snapshot;
   snapshot.observation.has_lidar_scan = true;

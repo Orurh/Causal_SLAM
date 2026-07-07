@@ -36,6 +36,28 @@ telemetry::TimingSummary OkTiming() {
   return summary;
 }
 
+telemetry::TimingSummary LidarJitterHighTiming() {
+  telemetry::TimingSummary summary;
+  summary.window_count = 10;
+  summary.last_period_ms = 100.0;
+  summary.last_jitter_ms = 12.5;
+  summary.window_max_jitter_ms = 12.5;
+  summary.health = telemetry::TimingHealth::kDegraded;
+  summary.reason = "jitter_high";
+  return summary;
+}
+
+telemetry::TimingSummary ImuJitterSuspiciousTiming() {
+  telemetry::TimingSummary summary;
+  summary.window_count = 10;
+  summary.last_period_ms = 10.0;
+  summary.last_jitter_ms = 3.0;
+  summary.window_max_jitter_ms = 3.0;
+  summary.health = telemetry::TimingHealth::kWarning;
+  summary.reason = "jitter_suspicious";
+  return summary;
+}
+
 coverage::ImuCoverageSummary OkCoverage() {
   coverage::ImuCoverageSummary summary;
   summary.imu_count_in_window = 5;
@@ -197,6 +219,14 @@ bool HasIssueWithReason(const TemporalDiagnosticSnapshot& snapshot, TemporalFaul
 TEST(TemporalDiagnosticsBuilderTest, FaultReasonToStringIsStable) {
   EXPECT_STREQ(ToString(TemporalFaultReason::kNone), "none");
   EXPECT_STREQ(ToString(TemporalFaultReason::kStreamTimingUnstable), "stream_timing_unstable");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kImuStreamTimingJitterSuspicious), "imu_stream_timing_jitter_suspicious");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kLidarStreamTimingJitterSuspicious), "lidar_stream_timing_jitter_suspicious");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kImuStreamTimingJitterHigh), "imu_stream_timing_jitter_high");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kLidarStreamTimingJitterHigh), "lidar_stream_timing_jitter_high");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kImuStreamTimingGap), "imu_stream_timing_gap");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kLidarStreamTimingGap), "lidar_stream_timing_gap");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kImuStreamTimingReordered), "imu_stream_timing_reordered");
+  EXPECT_STREQ(ToString(TemporalFaultReason::kLidarStreamTimingReordered), "lidar_stream_timing_reordered");
   EXPECT_STREQ(ToString(TemporalFaultReason::kImuWindowIncomplete), "imu_window_incomplete");
   EXPECT_STREQ(ToString(TemporalFaultReason::kLidarPointTimeUnsupported), "lidar_point_time_unsupported");
   EXPECT_STREQ(ToString(TemporalFaultReason::kTfLookupFailed), "tf_lookup_failed");
@@ -212,6 +242,40 @@ TEST(TemporalDiagnosticsBuilderTest, SupportedPointTimeAndOkCoverageProducesOkSn
 
   EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kOk);
   EXPECT_TRUE(snapshot.issues.empty());
+}
+
+TEST(TemporalDiagnosticsBuilderTest, LidarJitterHighProducesDegradedAndSpecificFaultReason) {
+  auto input = BaseOkInput();
+  input.streams = {
+      telemetry::MakeStreamTimingDiagnostic(telemetry::TemporalStreamId::kImu, OkTiming()),
+      telemetry::MakeStreamTimingDiagnostic(telemetry::TemporalStreamId::kLidar, LidarJitterHighTiming()),
+  };
+
+  const TemporalDiagnosticsBuilder builder;
+  const auto snapshot = builder.Build(input);
+
+  EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kDegraded);
+  EXPECT_TRUE(HasIssueWithReason(snapshot, TemporalFaultReason::kLidarStreamTimingJitterHigh));
+
+  const auto decision = policy::DecideMapUpdate(snapshot.overall_status);
+  EXPECT_FALSE(decision.map_update_allowed);
+}
+
+TEST(TemporalDiagnosticsBuilderTest, ImuJitterSuspiciousProducesWarningAndSpecificFaultReason) {
+  auto input = BaseOkInput();
+  input.streams = {
+      telemetry::MakeStreamTimingDiagnostic(telemetry::TemporalStreamId::kImu, ImuJitterSuspiciousTiming()),
+      telemetry::MakeStreamTimingDiagnostic(telemetry::TemporalStreamId::kLidar, OkTiming()),
+  };
+
+  const TemporalDiagnosticsBuilder builder;
+  const auto snapshot = builder.Build(input);
+
+  EXPECT_EQ(snapshot.overall_status, telemetry::TemporalHealthStatus::kWarning);
+  EXPECT_TRUE(HasIssueWithReason(snapshot, TemporalFaultReason::kImuStreamTimingJitterSuspicious));
+
+  const auto decision = policy::DecideMapUpdate(snapshot.overall_status);
+  EXPECT_TRUE(decision.map_update_allowed);
 }
 
 TEST(TemporalDiagnosticsBuilderTest, RejectedFloat32TimestampProducesWarning) {

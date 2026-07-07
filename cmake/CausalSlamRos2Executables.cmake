@@ -51,6 +51,7 @@ ament_target_dependencies(causal_slam_analyze_bag
 )
 
 target_link_libraries(causal_slam_analyze_bag
+  causal_slam_application
   causal_slam_ros_adapters
   causal_slam_presentation
 )

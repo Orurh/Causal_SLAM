@@ -30,6 +30,7 @@ target_include_directories(causal_slam_domain
 )
 
 set(CAUSAL_SLAM_APPLICATION_SOURCES
+  src/application/offline_analysis/offline_stream_timing_fault_analyzer.cc
   src/application/temporal_monitor/temporal_monitor_pipeline.cc
   src/application/temporal_monitor/temporal_monitor_runtime_defaults.cc
 )

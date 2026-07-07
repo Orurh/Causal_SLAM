@@ -133,6 +133,18 @@ struct DatasetVerdict {
   bool map_update_recommended = false;
 };
 
+struct StreamTimingFaultReport {
+  bool lidar_stream_timing_jitter_high = false;
+  bool lidar_stream_timing_short_period = false;
+  bool lidar_stream_timing_long_period = false;
+
+  double lidar_period_jitter_threshold_ms = 5.0;
+  double lidar_period_short_threshold_ratio = 0.8;
+  double lidar_period_long_threshold_ratio = 1.2;
+
+  std::map<std::string, std::uint64_t> fault_reasons;
+};
+
 struct OfflineTemporalReport {
   std::vector<TopicSummary> topics;
   std::uint64_t lidar_messages = 0;
@@ -144,6 +156,7 @@ struct OfflineTemporalReport {
   LidarFirstCloudSummary lidar_first_cloud;
   LidarScanWindowSummary lidar_scan_windows;
   OfflineImuCoverageReport imu_coverage;
+  StreamTimingFaultReport stream_timing_faults;
   DatasetVerdict verdict;
 };
 

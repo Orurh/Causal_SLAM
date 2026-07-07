@@ -89,9 +89,30 @@ ReportSection BuildTimingSection(std::string id, std::string title, const causal
   return section;
 }
 
+ReportSection BuildStreamTimingFaultsSection(const causal_slam::offline_analysis::OfflineTemporalReport& report) {
+  const auto& faults = report.stream_timing_faults;
+  auto section = MakeSection("stream_timing_faults", "Stream timing faults", "no stream timing faults");
+
+  section.metrics.push_back(Metric("lidar_stream_timing_jitter_high", BoolString(faults.lidar_stream_timing_jitter_high)));
+  section.metrics.push_back(Metric("lidar_stream_timing_short_period", BoolString(faults.lidar_stream_timing_short_period)));
+  section.metrics.push_back(Metric("lidar_stream_timing_long_period", BoolString(faults.lidar_stream_timing_long_period)));
+  section.metrics.push_back(Metric("lidar_period_jitter_threshold_ms", ToReportString(faults.lidar_period_jitter_threshold_ms)));
+  section.metrics.push_back(Metric("lidar_period_short_threshold_ratio", ToReportString(faults.lidar_period_short_threshold_ratio)));
+  section.metrics.push_back(Metric("lidar_period_long_threshold_ratio", ToReportString(faults.lidar_period_long_threshold_ratio)));
+
+  for (const auto& [reason, count] : faults.fault_reasons) {
+    section.rows.push_back(MakeRow(reason, "fault",
+                                   {
+                                       Metric("count", ToReportString(count)),
+                                   }));
+  }
+
+  return section;
+}
+
 ReportSection BuildPointCloudCapabilitiesSection(const causal_slam::offline_analysis::OfflineTemporalReport& report) {
   const auto& caps = report.lidar_first_cloud.capabilities;
-  auto section = MakeSection("pointcloud_capabilities", "PointCloud2 capabilities");
+  auto section = MakeSection("point_cloud2_capability", "PointCloud2 capabilities");
 
   section.metrics.push_back(Metric("has_xyz", BoolString(caps.has_x && caps.has_y && caps.has_z)));
   section.metrics.push_back(Metric("has_intensity", BoolString(caps.has_intensity)));
@@ -208,6 +229,7 @@ ReportDocument OfflineTemporalReportDocumentBuilder::Build(const causal_slam::of
   document.sections.push_back(BuildSelectedTopicsSection(report));
   document.sections.push_back(BuildTimingSection("imu_timing", "IMU timing", report.imu_timing));
   document.sections.push_back(BuildTimingSection("lidar_timing", "LiDAR timing", report.lidar_timing));
+  document.sections.push_back(BuildStreamTimingFaultsSection(report));
   document.sections.push_back(BuildPointCloudCapabilitiesSection(report));
   document.sections.push_back(BuildLidarScanWindowsSection(report));
   document.sections.push_back(BuildImuCoverageSection(report));

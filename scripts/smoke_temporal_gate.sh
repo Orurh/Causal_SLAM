@@ -219,6 +219,7 @@ run_case() {
   local imu_gap_threshold_ms="${11:-${SMOKE_IMU_GAP_THRESHOLD_MS}}"
   local imu_drop_every_n="${12:-0}"
   local imu_fault_injector_enabled="${13:-false}"
+  local expected_checked_lidar_forward="${14:-${expected_allowed}}"
   local html_report_path="${SMOKE_HTML_DIR}/causal_slam_smoke_${RUN_ID}_${case_name}.html"
 
   local case_id="${RUN_ID}/${case_name}"
@@ -350,7 +351,7 @@ run_case() {
   expect_topic_contains "${case_name}.decision_json.frame_id" \
     "${decision_json_topic}" "\"frame_id\":\"lidar\""
 
-  if [[ "${expected_allowed}" == "true" ]]; then
+  if [[ "${expected_checked_lidar_forward}" == "true" ]]; then
     expect_topic_has_message "${case_name}.checked_lidar.forward" \
       "${checked_lidar_topic}"
   else
@@ -370,7 +371,7 @@ run_case() {
 run_case "healthy_pipeline" "${SMOKE_HEALTHY_IMU_PERIOD_MS}" "true" "OK" "temporal_health_ok" "none"
 run_case "degraded_imu_pipeline" "${SMOKE_DEGRADED_IMU_PERIOD_MS}" "false" "DEGRADED" "temporal_health_degraded" "imu_window_incomplete"
 run_case "lagged_imu_timestamp_pipeline" "${SMOKE_HEALTHY_IMU_PERIOD_MS}" "false" "DEGRADED" "temporal_health_degraded" "imu_window_incomplete" "false" "false" "false" "${SMOKE_LAGGED_IMU_TIMESTAMP_SHIFT_MS}" "${SMOKE_IMU_GAP_THRESHOLD_MS}" "0" "true"
-run_case "dropped_imu_samples_pipeline" "${SMOKE_HEALTHY_IMU_PERIOD_MS}" "false" "DEGRADED" "temporal_health_degraded" "stream_timing_unstable" "false" "false" "false" "0.0" "${SMOKE_DROPPED_IMU_GAP_THRESHOLD_MS}" "${SMOKE_DROPPED_IMU_DROP_EVERY_N}" "true"
+run_case "dropped_imu_samples_pipeline" "${SMOKE_HEALTHY_IMU_PERIOD_MS}" "false" "DEGRADED" "temporal_health_degraded" "imu_stream_timing_gap" "false" "false" "false" "0.0" "${SMOKE_DROPPED_IMU_GAP_THRESHOLD_MS}" "${SMOKE_DROPPED_IMU_DROP_EVERY_N}" "true" "true"
 run_case "missing_tf_pipeline" "${SMOKE_HEALTHY_IMU_PERIOD_MS}" "false" "INVALID" "temporal_health_invalid" "tf_lookup_failed" "true"
 run_case "healthy_tf_pipeline" "${SMOKE_HEALTHY_IMU_PERIOD_MS}" "true" "OK" "temporal_health_ok" "none" "true" "true" "true"
 

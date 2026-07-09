@@ -85,11 +85,11 @@ TEST(LidarCloudGateTest, DropInvalidRejectsOnlyInvalidHealth) {
   EXPECT_EQ(invalid.reason, LidarCloudGateReason::kTemporalHealthInvalid);
 }
 
-TEST(LidarCloudGateTest, DropDegradedAllowsOnlyOkAndWarning) {
+TEST(LidarCloudGateTest, DropDegradedForwardsDiagnosticDegradedWithoutHardFusionBlocker) {
   EXPECT_TRUE(Evaluate(LidarGateMode::kDropDegraded, telemetry::TemporalHealthStatus::kOk).should_forward);
   EXPECT_TRUE(Evaluate(LidarGateMode::kDropDegraded, telemetry::TemporalHealthStatus::kWarning).should_forward);
 
-  EXPECT_FALSE(Evaluate(LidarGateMode::kDropDegraded, telemetry::TemporalHealthStatus::kDegraded).should_forward);
+  EXPECT_TRUE(Evaluate(LidarGateMode::kDropDegraded, telemetry::TemporalHealthStatus::kDegraded).should_forward);
   EXPECT_FALSE(Evaluate(LidarGateMode::kDropDegraded, telemetry::TemporalHealthStatus::kInvalid).should_forward);
 }
 
@@ -128,4 +128,36 @@ TEST(LidarCloudGateTest, DetectsMinimumTimingEvidence) {
 }
 
 }  // namespace
+
+TEST(LidarCloudGateTest, ClassifiesHardFusionBlockingReasons) {
+  EXPECT_TRUE(IsHardFusionBlockingReason("imu_window_incomplete"));
+  EXPECT_TRUE(IsHardFusionBlockingReason("imu_window_empty"));
+  EXPECT_TRUE(IsHardFusionBlockingReason("imu_window_missing_prefix"));
+  EXPECT_TRUE(IsHardFusionBlockingReason("imu_window_missing_suffix"));
+  EXPECT_TRUE(IsHardFusionBlockingReason("imu_window_internal_gap"));
+  EXPECT_TRUE(IsHardFusionBlockingReason("invalid_scan_window"));
+  EXPECT_TRUE(IsHardFusionBlockingReason("message_reordering_detected"));
+
+  EXPECT_FALSE(IsHardFusionBlockingReason("lidar_stream_timing_jitter_high"));
+  EXPECT_FALSE(IsHardFusionBlockingReason("imu_stream_timing_jitter_suspicious"));
+  EXPECT_FALSE(IsHardFusionBlockingReason("none"));
+}
+
+TEST(LidarCloudGateTest, DropDegradedBlocksHardFusionBlocker) {
+  const LidarCloudGateConfig config{
+      .mode = LidarGateMode::kDropDegraded,
+      .min_total_imu_samples_before_forward = 0,
+      .min_window_imu_samples_before_forward = 0,
+  };
+
+  const auto result = EvaluateLidarCloudGate(config, LidarCloudGateInput{
+                                                         .health = telemetry::TemporalHealthStatus::kDegraded,
+                                                         .total_imu_samples = 10,
+                                                         .window_imu_samples = 10,
+                                                         .has_hard_fusion_blocker = true,
+                                                     });
+
+  EXPECT_FALSE(result.should_forward);
+}
+
 }  // namespace causal_slam::policy

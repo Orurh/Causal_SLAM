@@ -80,21 +80,34 @@ bool IsActiveLidarGateMode(LidarGateMode mode) {
   return mode != LidarGateMode::kObserve;
 }
 
+bool IsHardFusionBlockingReason(std::string_view reason) {
+  return reason == "no_imu_sample_received_yet" || reason == "imu_window_incomplete" || reason == "imu_window_empty" ||
+         reason == "imu_window_missing_prefix" || reason == "imu_window_missing_suffix" || reason == "imu_window_internal_gap" ||
+         reason == "invalid_scan_window" || reason == "timestamp_invalid" || reason == "message_reordering_detected" ||
+         reason == "lidar_point_time_unsupported" || reason == "lidar_point_time_extraction_failed" || reason == "imu_stream_stale" ||
+         reason == "lidar_stream_stale";
+}
+
 bool HasMinimumTimingEvidenceForActiveGate(const LidarCloudGateConfig& config, const LidarCloudGateInput& input) {
   return input.total_imu_samples >= config.min_total_imu_samples_before_forward &&
          input.window_imu_samples >= config.min_window_imu_samples_before_forward;
 }
 
-bool ShouldForwardLidarCloud(LidarGateMode mode, causal_slam::telemetry::TemporalHealthStatus health) {
+bool ShouldForwardLidarCloud(LidarGateMode mode, causal_slam::telemetry::TemporalHealthStatus health, bool has_hard_fusion_blocker) {
   using causal_slam::telemetry::TemporalHealthStatus;
 
   switch (mode) {
     case LidarGateMode::kObserve:
       return true;
+
     case LidarGateMode::kDropInvalid:
       return health != TemporalHealthStatus::kInvalid;
+
     case LidarGateMode::kDropDegraded:
-      return health == TemporalHealthStatus::kOk || health == TemporalHealthStatus::kWarning;
+      // Stream-level jitter is diagnostic-only for downstream LIO.
+      // Drop only invalid state or scan-level hard fusion blockers.
+      return health != TemporalHealthStatus::kInvalid && !has_hard_fusion_blocker;
+
     case LidarGateMode::kStrict:
       return health == TemporalHealthStatus::kOk;
   }
@@ -118,7 +131,7 @@ LidarCloudGateResult EvaluateLidarCloudGate(const LidarCloudGateConfig& config, 
   }
 
   return LidarCloudGateResult{
-      .should_forward = ShouldForwardLidarCloud(config.mode, input.health),
+      .should_forward = ShouldForwardLidarCloud(config.mode, input.health, input.has_hard_fusion_blocker),
       .reason = ReasonForHealth(input.health),
   };
 }

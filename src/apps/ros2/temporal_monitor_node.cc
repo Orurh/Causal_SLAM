@@ -61,9 +61,45 @@ std::string ResolveSourceFrame(const std::string& configured_source_frame, const
   return configured_source_frame;
 }
 
+bool HasHardFusionBlockingIssue(const diagnostics::TemporalDiagnosticSnapshot& snapshot) {
+  for (const auto& issue : snapshot.issues) {
+    if (policy::IsHardFusionBlockingReason(diagnostics::ToString(issue.reason))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+std::string JoinHardFusionBlockingReasons(const diagnostics::TemporalDiagnosticSnapshot& snapshot) {
+  std::vector<std::string> reasons;
+
+  for (const auto& issue : snapshot.issues) {
+    const auto reason = diagnostics::ToString(issue.reason);
+    if (policy::IsHardFusionBlockingReason(reason)) {
+      reasons.emplace_back(reason);
+    }
+  }
+
+  if (reasons.empty()) {
+    return "none";
+  }
+
+  std::string joined;
+  for (std::size_t index = 0; index < reasons.size(); ++index) {
+    if (index > 0) {
+      joined += ",";
+    }
+    joined += reasons[index];
+  }
+
+  return joined;
+}
+
 policy::LidarCloudGateInput BuildLidarCloudGateInput(const diagnostics::TemporalDiagnosticSnapshot& snapshot) {
   policy::LidarCloudGateInput input{
       .health = snapshot.overall_status,
+      .has_hard_fusion_blocker = HasHardFusionBlockingIssue(snapshot),
   };
 
   const auto imu_stream = std::find_if(snapshot.observation.streams.begin(), snapshot.observation.streams.end(),
@@ -550,12 +586,13 @@ void TemporalMonitorNode::OnTimer() {
   }
 
   if (runtime_profile_ == RuntimeProfile::kDiagnostic) {
-    RCLCPP_INFO_STREAM(this->get_logger(), "Temporal gate summary"
-                                               << " | profile=" << ToString(runtime_profile_)
-                                               << " | health=" << telemetry::ToString(snapshot.diagnostics.overall_status)
-                                               << " | allowed=" << (snapshot.map_update_decision.map_update_allowed ? "true" : "false")
+    RCLCPP_INFO_STREAM(this->get_logger(), "Temporal diagnostics summary"
+                                               << " | profile=" << ToString(runtime_profile_) << " | health="
+                                               << telemetry::ToString(snapshot.diagnostics.overall_status) << " | map_update_allowed="
+                                               << (snapshot.map_update_decision.map_update_allowed ? "true" : "false")
                                                << " | reason=" << causal_slam::policy::ToString(snapshot.map_update_decision.reason)
-                                               << " | fault_reasons=" << diagnostics::JoinFaultReasons(snapshot.diagnostics.issues));
+                                               << " | fault_reasons=" << diagnostics::JoinFaultReasons(snapshot.diagnostics.issues)
+                                               << " | hard_blocking_reasons=" << JoinHardFusionBlockingReasons(snapshot.diagnostics));
     return;
   }
 

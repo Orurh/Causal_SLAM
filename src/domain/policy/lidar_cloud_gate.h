@@ -34,6 +34,7 @@ struct LidarCloudGateInput {
   causal_slam::telemetry::TemporalHealthStatus health{causal_slam::telemetry::TemporalHealthStatus::kOk};
   std::uint64_t total_imu_samples{0};
   std::uint64_t window_imu_samples{0};
+  bool has_hard_fusion_blocker{false};
 };
 
 struct LidarCloudGateResult {
@@ -48,9 +49,12 @@ struct LidarCloudGateResult {
 
 [[nodiscard]] bool IsActiveLidarGateMode(LidarGateMode mode);
 
+[[nodiscard]] bool IsHardFusionBlockingReason(std::string_view reason);
+
 [[nodiscard]] bool HasMinimumTimingEvidenceForActiveGate(const LidarCloudGateConfig& config, const LidarCloudGateInput& input);
 
-[[nodiscard]] bool ShouldForwardLidarCloud(LidarGateMode mode, causal_slam::telemetry::TemporalHealthStatus health);
+[[nodiscard]] bool ShouldForwardLidarCloud(LidarGateMode mode, causal_slam::telemetry::TemporalHealthStatus health,
+                                           bool has_hard_fusion_blocker);
 
 [[nodiscard]] LidarCloudGateResult EvaluateLidarCloudGate(const LidarCloudGateConfig& config, const LidarCloudGateInput& input);
 

@@ -480,7 +480,8 @@ void TemporalMonitorNode::ProcessLidarCloud(PointCloud2Msg::ConstSharedPtr msg, 
   ObserveConfiguredTransformsForLidar(*msg, header_stamp_ns, receive_time_ns);
 
   const auto scan_snapshot = temporal_pipeline_->BuildLatestDiagnosticSnapshot();
-  const auto scan_map_update_decision = causal_slam::policy::DecideMapUpdate(scan_snapshot.overall_status);
+  const auto scan_map_update_decision =
+      causal_slam::policy::DecideMapUpdate(scan_snapshot.overall_status, HasHardFusionBlockingIssue(scan_snapshot));
 
   PublishDiagnosticTopics(scan_snapshot, scan_map_update_decision, false);
 

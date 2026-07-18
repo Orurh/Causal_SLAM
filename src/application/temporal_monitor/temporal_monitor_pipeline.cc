@@ -1,5 +1,6 @@
 #include "temporal_monitor_pipeline.h"
 
+#include "domain/policy/lidar_cloud_gate.h"
 #include "domain/time/time_units.h"
 
 #include <algorithm>
@@ -180,12 +181,15 @@ TemporalMonitorPipelineSnapshot TemporalMonitorPipeline::BuildSnapshot(std::int6
 
   const causal_slam::diagnostics::TemporalDiagnosticsBuilder diagnostics_builder;
   const auto diagnostic_snapshot = diagnostics_builder.Build(observation);
+  const bool has_hard_fusion_blocker = std::any_of(
+      diagnostic_snapshot.issues.begin(), diagnostic_snapshot.issues.end(),
+      [](const auto& issue) { return causal_slam::policy::IsHardFusionBlockingReason(causal_slam::diagnostics::ToString(issue.reason)); });
 
   temporal_statistics_.Observe(now_ns, diagnostic_snapshot.observation, diagnostic_snapshot.overall_status);
 
   return TemporalMonitorPipelineSnapshot{
       .diagnostics = diagnostic_snapshot,
-      .map_update_decision = causal_slam::policy::DecideMapUpdate(diagnostic_snapshot.overall_status),
+      .map_update_decision = causal_slam::policy::DecideMapUpdate(diagnostic_snapshot.overall_status, has_hard_fusion_blocker),
       .statistics = temporal_statistics_.Snapshot(now_ns),
   };
 }

@@ -3,6 +3,7 @@
 #include "application/offline_analysis/offline_stream_timing_fault_analyzer.h"
 
 #include "apps/ros2/analyze_bag_cli.h"
+#include "apps/ros2/bag_topic_inspector.h"
 
 #include <algorithm>
 #include <cmath>
@@ -715,30 +716,17 @@ int AnalyzeBag(const AnalyzeBagOptions& options, std::ostream& out, std::ostream
 
 int ListTopics(const AnalyzeBagOptions& options, std::ostream& out, std::ostream& err) {
   try {
-    rosbag2_cpp::Reader reader;
-    reader.open(options.bag_path);
-
-    const auto topics = reader.get_all_topics_and_types();
-
-    std::map<std::string, std::uint64_t> message_counts;
-    for (const auto& topic : topics) {
-      message_counts[topic.name] = 0;
-    }
-
-    while (reader.has_next()) {
-      const auto message = reader.read_next();
-      ++message_counts[message->topic_name];
-    }
+    const auto inspection = causal_slam::apps::ros2::InspectBagTopics(options.bag_path);
 
     out << "Bag topics:\n";
 
-    if (topics.empty()) {
+    if (inspection.topics.empty()) {
       out << "  none\n";
       return 0;
     }
 
-    for (const auto& topic : topics) {
-      out << "  " << topic.name << " " << topic.type << " messages=" << message_counts[topic.name] << "\n";
+    for (const auto& topic : inspection.topics) {
+      out << "  " << topic.name << " " << topic.type << " messages=" << topic.message_count << "\n";
     }
 
     return 0;

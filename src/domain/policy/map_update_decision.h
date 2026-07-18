@@ -33,7 +33,7 @@ struct MapUpdateDecision {
   return "unknown";
 }
 
-[[nodiscard]] inline MapUpdateDecision DecideMapUpdate(causal_slam::telemetry::TemporalHealthStatus status) {
+[[nodiscard]] inline MapUpdateDecision DecideMapUpdate(causal_slam::telemetry::TemporalHealthStatus status, bool has_hard_fusion_blocker) {
   using causal_slam::telemetry::TemporalHealthStatus;
 
   switch (status) {
@@ -49,7 +49,7 @@ struct MapUpdateDecision {
       };
     case TemporalHealthStatus::kDegraded:
       return MapUpdateDecision{
-          .map_update_allowed = false,
+          .map_update_allowed = !has_hard_fusion_blocker,
           .reason = MapUpdateDecisionReason::kTemporalHealthDegraded,
       };
     case TemporalHealthStatus::kInvalid:
@@ -63,6 +63,12 @@ struct MapUpdateDecision {
       .map_update_allowed = false,
       .reason = MapUpdateDecisionReason::kTemporalHealthInvalid,
   };
+}
+
+[[nodiscard]] inline MapUpdateDecision DecideMapUpdate(causal_slam::telemetry::TemporalHealthStatus status) {
+  using causal_slam::telemetry::TemporalHealthStatus;
+
+  return DecideMapUpdate(status, status == TemporalHealthStatus::kDegraded);
 }
 
 }  // namespace causal_slam::policy

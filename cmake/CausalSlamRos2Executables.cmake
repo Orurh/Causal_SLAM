@@ -40,6 +40,7 @@ add_executable(causal_slam_analyze_bag
   src/apps/ros2/analyze_bag_main.cc
   src/apps/ros2/analyze_bag_app.cc
   src/apps/ros2/analyze_bag_cli.cc
+  src/apps/ros2/bag_topic_inspector.cc
 )
 
 ament_target_dependencies(causal_slam_analyze_bag
@@ -64,6 +65,23 @@ endif()
 
 causal_slam_target_include_src(causal_slam_analyze_bag)
 causal_slam_install_ros2_executable(causal_slam_analyze_bag)
+
+add_executable(causal_slam_session
+  src/apps/ros2/session_main.cc
+  src/apps/ros2/session_app.cc
+  src/apps/ros2/session_cli.cc
+  src/apps/ros2/bag_topic_inspector.cc
+)
+
+ament_target_dependencies(causal_slam_session
+  rclcpp
+  std_msgs
+  rosbag2_cpp
+  rosbag2_storage
+)
+
+causal_slam_target_include_src(causal_slam_session)
+causal_slam_install_ros2_executable(causal_slam_session)
 
 # Developer/demo ROS2 tools.
 add_executable(fake_imu_publisher_node

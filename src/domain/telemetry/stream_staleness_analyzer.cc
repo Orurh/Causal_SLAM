@@ -13,15 +13,14 @@ void StreamStalenessAnalyzer::SetConfig(const StreamStalenessConfig& config) {
 
 StreamStalenessSummary StreamStalenessAnalyzer::Analyze(std::optional<std::int64_t> latest_arrival_time_ns,
                                                         std::int64_t now_arrival_time_ns) const {
-  StreamStalenessSummary summary{
-      .stream_id = stream_id_,
-      .state = StreamStalenessState::kMissing,
-      .enabled = config_.enabled,
-      .latest_arrival_time_ns = latest_arrival_time_ns,
-      .now_arrival_time_ns = now_arrival_time_ns,
-      .max_staleness_ns = std::max<std::int64_t>(config_.max_staleness_ns, 1),
-      .age_ns = 0,
-  };
+  StreamStalenessSummary summary;
+  summary.stream_id = stream_id_;
+  summary.state = StreamStalenessState::kMissing;
+  summary.enabled = config_.enabled;
+  summary.latest_arrival_time_ns = latest_arrival_time_ns;
+  summary.now_arrival_time_ns = now_arrival_time_ns;
+  summary.max_staleness_ns = std::max<std::int64_t>(config_.max_staleness_ns, 1);
+  summary.age_ns = 0;
 
   if (!config_.enabled) {
     summary.state = StreamStalenessState::kFresh;

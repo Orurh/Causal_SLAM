@@ -20,7 +20,7 @@ std::optional<std::string> RequireValue(int argc, char** argv, int index, std::s
   }
 
   const std::string_view value{argv[value_index]};
-  if (value.empty() || value.starts_with("--")) {
+  if (value.empty() || (value.size() >= 2 && value[0] == '-' && value[1] == '-')) {
     err << "Missing value for " << option << ".\n";
     return std::nullopt;
   }

@@ -117,23 +117,15 @@ bool ShouldForwardLidarCloud(LidarGateMode mode, causal_slam::telemetry::Tempora
 
 LidarCloudGateResult EvaluateLidarCloudGate(const LidarCloudGateConfig& config, const LidarCloudGateInput& input) {
   if (!IsActiveLidarGateMode(config.mode)) {
-    return LidarCloudGateResult{
-        .should_forward = true,
-        .reason = LidarCloudGateReason::kObserveMode,
-    };
+    return LidarCloudGateResult{true, LidarCloudGateReason::kObserveMode};
   }
 
   if (!HasMinimumTimingEvidenceForActiveGate(config, input)) {
-    return LidarCloudGateResult{
-        .should_forward = false,
-        .reason = LidarCloudGateReason::kInsufficientTimingEvidence,
-    };
+    return LidarCloudGateResult{false, LidarCloudGateReason::kInsufficientTimingEvidence};
   }
 
-  return LidarCloudGateResult{
-      .should_forward = ShouldForwardLidarCloud(config.mode, input.health, input.has_hard_fusion_blocker),
-      .reason = ReasonForHealth(input.health),
-  };
+  return LidarCloudGateResult{ShouldForwardLidarCloud(config.mode, input.health, input.has_hard_fusion_blocker),
+                              ReasonForHealth(input.health)};
 }
 
 }  // namespace causal_slam::policy

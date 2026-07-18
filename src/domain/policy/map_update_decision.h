@@ -38,31 +38,19 @@ struct MapUpdateDecision {
 
   switch (status) {
     case TemporalHealthStatus::kOk:
-      return MapUpdateDecision{
-          .map_update_allowed = true,
-          .reason = MapUpdateDecisionReason::kTemporalHealthOk,
-      };
+      return MapUpdateDecision{true, MapUpdateDecisionReason::kTemporalHealthOk};
+
     case TemporalHealthStatus::kWarning:
-      return MapUpdateDecision{
-          .map_update_allowed = true,
-          .reason = MapUpdateDecisionReason::kTemporalHealthWarning,
-      };
+      return MapUpdateDecision{true, MapUpdateDecisionReason::kTemporalHealthWarning};
+
     case TemporalHealthStatus::kDegraded:
-      return MapUpdateDecision{
-          .map_update_allowed = !has_hard_fusion_blocker,
-          .reason = MapUpdateDecisionReason::kTemporalHealthDegraded,
-      };
+      return MapUpdateDecision{!has_hard_fusion_blocker, MapUpdateDecisionReason::kTemporalHealthDegraded};
+
     case TemporalHealthStatus::kInvalid:
-      return MapUpdateDecision{
-          .map_update_allowed = false,
-          .reason = MapUpdateDecisionReason::kTemporalHealthInvalid,
-      };
+      return MapUpdateDecision{false, MapUpdateDecisionReason::kTemporalHealthInvalid};
   }
 
-  return MapUpdateDecision{
-      .map_update_allowed = false,
-      .reason = MapUpdateDecisionReason::kTemporalHealthInvalid,
-  };
+  return MapUpdateDecision{false, MapUpdateDecisionReason::kTemporalHealthInvalid};
 }
 
 [[nodiscard]] inline MapUpdateDecision DecideMapUpdate(causal_slam::telemetry::TemporalHealthStatus status) {

@@ -97,10 +97,9 @@ std::string JoinHardFusionBlockingReasons(const diagnostics::TemporalDiagnosticS
 }
 
 policy::LidarCloudGateInput BuildLidarCloudGateInput(const diagnostics::TemporalDiagnosticSnapshot& snapshot) {
-  policy::LidarCloudGateInput input{
-      .health = snapshot.overall_status,
-      .has_hard_fusion_blocker = HasHardFusionBlockingIssue(snapshot),
-  };
+  policy::LidarCloudGateInput input;
+  input.health = snapshot.overall_status;
+  input.has_hard_fusion_blocker = HasHardFusionBlockingIssue(snapshot);
 
   const auto imu_stream = std::find_if(snapshot.observation.streams.begin(), snapshot.observation.streams.end(),
                                        [](const auto& stream) { return stream.id == telemetry::TemporalStreamId::kImu; });
@@ -138,13 +137,13 @@ void LogImuCoverageSummary(const rclcpp::Logger& logger, const std::optional<cov
 
 causal_slam::lidar::LidarScanWindowEstimate BuildHoldbackPointTimeScanWindowEstimate(
     const causal_slam::pointcloud::PointCloud2TimeFieldExtraction& extraction) {
-  return causal_slam::lidar::LidarScanWindowEstimate{
-      .window = extraction.scan_window,
-      .duration_ms = static_cast<double>(extraction.scan_window.DurationNs()) / 1'000'000.0,
-      .source = causal_slam::lidar::LidarScanWindowSource::kPointTimeField,
-      .confidence = causal_slam::lidar::LidarScanWindowConfidence::kHigh,
-      .reason = extraction.reason,
-  };
+  causal_slam::lidar::LidarScanWindowEstimate estimate;
+  estimate.window = extraction.scan_window;
+  estimate.duration_ms = static_cast<double>(extraction.scan_window.DurationNs()) / 1'000'000.0;
+  estimate.source = causal_slam::lidar::LidarScanWindowSource::kPointTimeField;
+  estimate.confidence = causal_slam::lidar::LidarScanWindowConfidence::kHigh;
+  estimate.reason = extraction.reason;
+  return estimate;
 }
 
 }  // namespace
@@ -154,11 +153,9 @@ TemporalMonitorNode::TemporalMonitorNode(const rclcpp::NodeOptions& options) : r
 
   runtime_profile_ = params.runtime_profile;
   html_report_path_ = params.html_report_path;
-  lidar_gate_config_ = policy::LidarCloudGateConfig{
-      .mode = policy::ParseLidarGateMode(params.lidar_gate_mode),
-      .min_total_imu_samples_before_forward = params.gate_min_total_imu_samples_before_forward,
-      .min_window_imu_samples_before_forward = params.gate_min_window_imu_samples_before_forward,
-  };
+  lidar_gate_config_.mode = policy::ParseLidarGateMode(params.lidar_gate_mode);
+  lidar_gate_config_.min_total_imu_samples_before_forward = params.gate_min_total_imu_samples_before_forward;
+  lidar_gate_config_.min_window_imu_samples_before_forward = params.gate_min_window_imu_samples_before_forward;
   lidar_holdback_enabled_ = params.lidar_holdback_enabled;
   lidar_holdback_scan_duration_ns_ = static_cast<std::int64_t>(std::llround(params.lidar_scan_duration_ms * 1'000'000.0));
   lidar_holdback_tolerance_ns_ = static_cast<std::int64_t>(std::llround(params.lidar_holdback_tolerance_ms * 1'000'000.0));
@@ -350,10 +347,10 @@ void TemporalMonitorNode::OnImuReceived(ImuMsg::ConstSharedPtr msg) {
     latest_imu_header_stamp_ns_ = header_stamp_ns;
   }
 
-  temporal_pipeline_->ObserveImu(pipeline::ImuPipelineInput{
-      .header_stamp_ns = header_stamp_ns,
-      .receive_time_ns = this->now().nanoseconds(),
-  });
+  pipeline::ImuPipelineInput input;
+  input.header_stamp_ns = header_stamp_ns;
+  input.receive_time_ns = this->now().nanoseconds();
+  temporal_pipeline_->ObserveImu(input);
 
   ProcessReadyPendingLidarClouds();
 }
@@ -375,13 +372,13 @@ void TemporalMonitorNode::OnLidarReceived(PointCloud2Msg::ConstSharedPtr msg) {
     return;
   }
 
-  pending_lidar_clouds_.push_back(PendingLidarCloud{
-      .msg = msg,
-      .header_stamp_ns = header_stamp_ns,
-      .receive_time_ns = receive_time_ns,
-      .ready_imu_stamp_ns = ready_imu_stamp_ns,
-      .precomputed_scan_window_estimate = precomputed_scan_window_estimate,
-  });
+  PendingLidarCloud pending_cloud;
+  pending_cloud.msg = msg;
+  pending_cloud.header_stamp_ns = header_stamp_ns;
+  pending_cloud.receive_time_ns = receive_time_ns;
+  pending_cloud.ready_imu_stamp_ns = ready_imu_stamp_ns;
+  pending_cloud.precomputed_scan_window_estimate = precomputed_scan_window_estimate;
+  pending_lidar_clouds_.push_back(pending_cloud);
 
   DropOldestPendingLidarCloudsIfNeeded();
 
@@ -468,14 +465,14 @@ void TemporalMonitorNode::ProcessLidarCloud(PointCloud2Msg::ConstSharedPtr msg, 
                                             std::optional<causal_slam::lidar::LidarScanWindowEstimate> precomputed_scan_window_estimate) {
   const std::int64_t header_stamp_ns = rclcpp::Time(msg->header.stamp).nanoseconds();
 
-  temporal_pipeline_->ObserveLidar(pipeline::LidarPipelineInput{
-      .header_stamp_ns = header_stamp_ns,
-      .receive_time_ns = receive_time_ns,
-      .frame_id = msg->header.frame_id,
-      .fields = ros_adapters::ToPointCloud2FieldInfos(*msg),
-      .cloud_view = ros_adapters::ToPointCloud2CloudView(*msg),
-      .precomputed_scan_window_estimate = precomputed_scan_window_estimate,
-  });
+  pipeline::LidarPipelineInput input;
+  input.header_stamp_ns = header_stamp_ns;
+  input.receive_time_ns = receive_time_ns;
+  input.frame_id = msg->header.frame_id;
+  input.fields = ros_adapters::ToPointCloud2FieldInfos(*msg);
+  input.cloud_view = ros_adapters::ToPointCloud2CloudView(*msg);
+  input.precomputed_scan_window_estimate = precomputed_scan_window_estimate;
+  temporal_pipeline_->ObserveLidar(input);
 
   ObserveConfiguredTransformsForLidar(*msg, header_stamp_ns, receive_time_ns);
 
@@ -503,12 +500,12 @@ void TemporalMonitorNode::ObserveConfiguredTransformsForLidar(const PointCloud2M
   for (const auto& check : transform_checks_) {
     const std::string source_frame = ResolveSourceFrame(check.source_frame, msg.header.frame_id);
 
-    observations.push_back(ros_adapters::LookupTransform(*tf_buffer_, ros_adapters::TransformLookupRequest{
-                                                                          .target_frame = check.target_frame,
-                                                                          .source_frame = source_frame,
-                                                                          .requested_stamp_ns = header_stamp_ns,
-                                                                          .receive_time_ns = receive_time_ns,
-                                                                      }));
+    ros_adapters::TransformLookupRequest request;
+    request.target_frame = check.target_frame;
+    request.source_frame = source_frame;
+    request.requested_stamp_ns = header_stamp_ns;
+    request.receive_time_ns = receive_time_ns;
+    observations.push_back(ros_adapters::LookupTransform(*tf_buffer_, request));
   }
 
   temporal_pipeline_->ObserveTransforms(observations);

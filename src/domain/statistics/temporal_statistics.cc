@@ -115,23 +115,20 @@ StreamTimingAccumulator& FindOrAppendStreamAccumulator(std::vector<StreamTimingA
     return *it;
   }
 
-  accumulators->push_back(StreamTimingAccumulator{
-      .id = id,
-      .delay_ms = {},
-      .period_ms = {},
-      .jitter_ms = {},
-  });
+  StreamTimingAccumulator accumulator;
+  accumulator.id = id;
+  accumulators->push_back(std::move(accumulator));
 
   return accumulators->back();
 }
 
 StreamTimingStatistics BuildStreamTimingStatistics(StreamTimingAccumulator accumulator) {
-  return StreamTimingStatistics{
-      .id = accumulator.id,
-      .delay_ms = BuildNumericStats(std::move(accumulator.delay_ms)),
-      .period_ms = BuildNumericStats(std::move(accumulator.period_ms)),
-      .jitter_ms = BuildNumericStats(std::move(accumulator.jitter_ms)),
-  };
+  StreamTimingStatistics statistics;
+  statistics.id = accumulator.id;
+  statistics.delay_ms = BuildNumericStats(std::move(accumulator.delay_ms));
+  statistics.period_ms = BuildNumericStats(std::move(accumulator.period_ms));
+  statistics.jitter_ms = BuildNumericStats(std::move(accumulator.jitter_ms));
+  return statistics;
 }
 
 void IncrementBlockReason(const std::string& reason, std::vector<CloudBlockReasonCount>* counts) {
@@ -144,10 +141,10 @@ void IncrementBlockReason(const std::string& reason, std::vector<CloudBlockReaso
     return;
   }
 
-  counts->push_back(CloudBlockReasonCount{
-      .reason = key,
-      .count = 1,
-  });
+  CloudBlockReasonCount count;
+  count.reason = key;
+  count.count = 1;
+  counts->push_back(std::move(count));
 }
 
 }  // namespace
@@ -169,11 +166,10 @@ TemporalStatisticsAggregator::TemporalStatisticsAggregator(TemporalStatisticsAgg
 
 void TemporalStatisticsAggregator::Observe(std::int64_t observed_at_ns, const causal_slam::model::TemporalObservation& observation,
                                            causal_slam::telemetry::TemporalHealthStatus overall_status) {
-  Sample sample{
-      .observed_at_ns = observed_at_ns,
-      .overall_status = overall_status,
-      .observation = observation,
-  };
+  Sample sample;
+  sample.observed_at_ns = observed_at_ns;
+  sample.overall_status = overall_status;
+  sample.observation = observation;
 
   rolling_samples_.push_back(sample);
   session_samples_.push_back(sample);

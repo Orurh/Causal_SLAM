@@ -13,10 +13,7 @@ struct StreamTimingDiagnostic {
 };
 
 [[nodiscard]] inline StreamTimingDiagnostic MakeStreamTimingDiagnostic(TemporalStreamId id, TimingSummary timing) {
-  return StreamTimingDiagnostic{
-      .id = id,
-      .timing = std::move(timing),
-  };
+  return StreamTimingDiagnostic{id, std::move(timing)};
 }
 
 }  // namespace causal_slam::telemetry

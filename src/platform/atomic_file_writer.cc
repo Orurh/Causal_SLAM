@@ -16,10 +16,7 @@ std::filesystem::path MakeTemporaryPath(const std::filesystem::path& output_path
 
 WriteTextFileResult WriteTextFileAtomically(const std::filesystem::path& output_path, std::string_view content) {
   if (output_path.empty()) {
-    return WriteTextFileResult{
-        .ok = false,
-        .error = "output_path_is_empty",
-    };
+    return WriteTextFileResult{false, "output_path_is_empty"};
   }
 
   std::error_code error_code;
@@ -28,10 +25,7 @@ WriteTextFileResult WriteTextFileAtomically(const std::filesystem::path& output_
   if (!parent_path.empty()) {
     std::filesystem::create_directories(parent_path, error_code);
     if (error_code) {
-      return WriteTextFileResult{
-          .ok = false,
-          .error = "failed_to_create_parent_directory: " + error_code.message(),
-      };
+      return WriteTextFileResult{false, "failed_to_create_parent_directory: " + error_code.message()};
     }
   }
 
@@ -40,32 +34,23 @@ WriteTextFileResult WriteTextFileAtomically(const std::filesystem::path& output_
   {
     std::ofstream file(temporary_path, std::ios::binary | std::ios::trunc);
     if (!file.is_open()) {
-      return WriteTextFileResult{
-          .ok = false,
-          .error = "failed_to_open_temporary_file",
-      };
+      return WriteTextFileResult{false, "failed_to_open_temporary_file"};
     }
 
     file.write(content.data(), static_cast<std::streamsize>(content.size()));
 
     if (!file.good()) {
-      return WriteTextFileResult{
-          .ok = false,
-          .error = "failed_to_write_temporary_file",
-      };
+      return WriteTextFileResult{false, "failed_to_write_temporary_file"};
     }
   }
 
   std::filesystem::rename(temporary_path, output_path, error_code);
   if (error_code) {
     std::filesystem::remove(temporary_path);
-    return WriteTextFileResult{
-        .ok = false,
-        .error = "failed_to_replace_output_file: " + error_code.message(),
-    };
+    return WriteTextFileResult{false, "failed_to_replace_output_file: " + error_code.message()};
   }
 
-  return WriteTextFileResult{.ok = true, .error = ""};
+  return WriteTextFileResult{true, ""};
 }
 
 }  // namespace causal_slam::platform

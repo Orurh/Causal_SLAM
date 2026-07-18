@@ -26,28 +26,16 @@ causal_slam::core::TimeWindow BuildLidarScanWindow(const std::int64_t stamp_ns, 
 
   switch (stamp_policy) {
     case LidarStampPolicy::kScanStart:
-      return causal_slam::core::TimeWindow{
-          .start_ns = stamp_ns,
-          .end_ns = stamp_ns + duration_ns,
-      };
+      return causal_slam::core::TimeWindow{stamp_ns, stamp_ns + duration_ns};
 
     case LidarStampPolicy::kScanMiddle:
-      return causal_slam::core::TimeWindow{
-          .start_ns = stamp_ns - (duration_ns / 2),
-          .end_ns = stamp_ns + (duration_ns / 2),
-      };
+      return causal_slam::core::TimeWindow{stamp_ns - (duration_ns / 2), stamp_ns + (duration_ns / 2)};
 
     case LidarStampPolicy::kScanEnd:
-      return causal_slam::core::TimeWindow{
-          .start_ns = stamp_ns - duration_ns,
-          .end_ns = stamp_ns,
-      };
+      return causal_slam::core::TimeWindow{stamp_ns - duration_ns, stamp_ns};
   }
 
-  return causal_slam::core::TimeWindow{
-      .start_ns = stamp_ns - duration_ns,
-      .end_ns = stamp_ns,
-  };
+  return causal_slam::core::TimeWindow{stamp_ns - duration_ns, stamp_ns};
 }
 
 }  // namespace causal_slam::lidar

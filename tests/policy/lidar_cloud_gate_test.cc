@@ -11,19 +11,38 @@ namespace {
 
 namespace telemetry = causal_slam::telemetry;
 
+LidarCloudGateConfig MakeConfig(
+    LidarGateMode mode,
+    std::uint64_t min_total_imu_samples = 5,
+    std::uint64_t min_window_imu_samples = 2) {
+  LidarCloudGateConfig config;
+  config.mode = mode;
+  config.min_total_imu_samples_before_forward =
+      min_total_imu_samples;
+  config.min_window_imu_samples_before_forward =
+      min_window_imu_samples;
+  return config;
+}
+
+LidarCloudGateInput MakeInput(
+    telemetry::TemporalHealthStatus health,
+    std::uint64_t total_imu_samples,
+    std::uint64_t window_imu_samples,
+    bool has_hard_fusion_blocker = false) {
+  LidarCloudGateInput input;
+  input.health = health;
+  input.total_imu_samples = total_imu_samples;
+  input.window_imu_samples = window_imu_samples;
+  input.has_hard_fusion_blocker = has_hard_fusion_blocker;
+  return input;
+}
+
 LidarCloudGateResult Evaluate(LidarGateMode mode, telemetry::TemporalHealthStatus health, std::uint64_t total_imu_samples = 5,
                               std::uint64_t window_imu_samples = 2) {
-  const LidarCloudGateConfig config{
-      .mode = mode,
-      .min_total_imu_samples_before_forward = 5,
-      .min_window_imu_samples_before_forward = 2,
-  };
-
-  return EvaluateLidarCloudGate(config, LidarCloudGateInput{
-                                            .health = health,
-                                            .total_imu_samples = total_imu_samples,
-                                            .window_imu_samples = window_imu_samples,
-                                        });
+  const auto config = MakeConfig(mode);
+  const auto input =
+      MakeInput(health, total_imu_samples, window_imu_samples);
+  return EvaluateLidarCloudGate(config, input);
 }
 
 TEST(LidarCloudGateTest, ParsesKnownModes) {
@@ -102,29 +121,19 @@ TEST(LidarCloudGateTest, StrictAllowsOnlyOk) {
 }
 
 TEST(LidarCloudGateTest, DetectsMinimumTimingEvidence) {
-  const LidarCloudGateConfig config{
-      .mode = LidarGateMode::kDropInvalid,
-      .min_total_imu_samples_before_forward = 5,
-      .min_window_imu_samples_before_forward = 2,
-  };
+  const auto config = MakeConfig(LidarGateMode::kDropInvalid);
 
-  EXPECT_FALSE(HasMinimumTimingEvidenceForActiveGate(config, LidarCloudGateInput{
-                                                                 .health = telemetry::TemporalHealthStatus::kOk,
-                                                                 .total_imu_samples = 4,
-                                                                 .window_imu_samples = 2,
-                                                             }));
+  EXPECT_FALSE(HasMinimumTimingEvidenceForActiveGate(
+      config,
+      MakeInput(telemetry::TemporalHealthStatus::kOk, 4, 2)));
 
-  EXPECT_FALSE(HasMinimumTimingEvidenceForActiveGate(config, LidarCloudGateInput{
-                                                                 .health = telemetry::TemporalHealthStatus::kOk,
-                                                                 .total_imu_samples = 5,
-                                                                 .window_imu_samples = 1,
-                                                             }));
+  EXPECT_FALSE(HasMinimumTimingEvidenceForActiveGate(
+      config,
+      MakeInput(telemetry::TemporalHealthStatus::kOk, 5, 1)));
 
-  EXPECT_TRUE(HasMinimumTimingEvidenceForActiveGate(config, LidarCloudGateInput{
-                                                                .health = telemetry::TemporalHealthStatus::kOk,
-                                                                .total_imu_samples = 5,
-                                                                .window_imu_samples = 2,
-                                                            }));
+  EXPECT_TRUE(HasMinimumTimingEvidenceForActiveGate(
+      config,
+      MakeInput(telemetry::TemporalHealthStatus::kOk, 5, 2)));
 }
 
 }  // namespace
@@ -144,18 +153,15 @@ TEST(LidarCloudGateTest, ClassifiesHardFusionBlockingReasons) {
 }
 
 TEST(LidarCloudGateTest, DropDegradedBlocksHardFusionBlocker) {
-  const LidarCloudGateConfig config{
-      .mode = LidarGateMode::kDropDegraded,
-      .min_total_imu_samples_before_forward = 0,
-      .min_window_imu_samples_before_forward = 0,
-  };
+  const auto config =
+      MakeConfig(LidarGateMode::kDropDegraded, 0, 0);
+  const auto input = MakeInput(
+      telemetry::TemporalHealthStatus::kDegraded,
+      10,
+      10,
+      true);
 
-  const auto result = EvaluateLidarCloudGate(config, LidarCloudGateInput{
-                                                         .health = telemetry::TemporalHealthStatus::kDegraded,
-                                                         .total_imu_samples = 10,
-                                                         .window_imu_samples = 10,
-                                                         .has_hard_fusion_blocker = true,
-                                                     });
+  const auto result = EvaluateLidarCloudGate(config, input);
 
   EXPECT_FALSE(result.should_forward);
 }

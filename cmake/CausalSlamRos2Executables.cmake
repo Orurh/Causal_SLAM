@@ -71,6 +71,8 @@ add_executable(causal_slam_session
   src/apps/ros2/session_app.cc
   src/apps/ros2/session_cli.cc
   src/apps/ros2/bag_topic_inspector.cc
+  src/apps/ros2/point_cloud2_topic_classifier.cc
+  src/apps/ros2/custom_sensor_topic_classifier.cc
 )
 
 ament_target_dependencies(causal_slam_session

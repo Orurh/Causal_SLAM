@@ -230,10 +230,8 @@ PointCloud2TimeFieldExtraction PointCloud2TimeFieldExtractor::Extract(const Poin
     return extraction;
   }
 
-  extraction.scan_window = causal_slam::core::TimeWindow{
-      .start_ns = *min_point_time_ns,
-      .end_ns = *max_point_time_ns,
-  };
+  extraction.scan_window.start_ns = *min_point_time_ns;
+  extraction.scan_window.end_ns = *max_point_time_ns;
 
   extraction.has_scan_window = extraction.scan_window.IsValid();
   extraction.reason = extraction.has_scan_window ? "point_time_field_extracted" : "invalid_extracted_scan_window";

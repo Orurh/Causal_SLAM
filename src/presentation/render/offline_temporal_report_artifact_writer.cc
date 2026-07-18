@@ -38,11 +38,10 @@ bool OfflineTemporalReportArtifactWriter::WriteJson(const std::string& path, con
   }
 
   const OfflineTemporalReportJsonRenderer renderer;
-  const OfflineTemporalReportRenderContext render_context{
-      .bag_path = context.bag_path,
-      .lidar_topic = context.lidar_topic,
-      .imu_topic = context.imu_topic,
-  };
+  OfflineTemporalReportRenderContext render_context;
+  render_context.bag_path = context.bag_path;
+  render_context.lidar_topic = context.lidar_topic;
+  render_context.imu_topic = context.imu_topic;
 
   file << renderer.Render(render_context, report);
   return true;

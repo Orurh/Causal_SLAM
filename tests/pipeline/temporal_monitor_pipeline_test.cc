@@ -48,17 +48,19 @@ TemporalMonitorPipelineConfig MakeConfig() {
 }
 
 causal_slam::lidar::LidarScanWindowEstimate MakePrecomputedScanWindowEstimate(std::int64_t start_ns, std::int64_t duration_ms) {
-  return causal_slam::lidar::LidarScanWindowEstimate{
-      .window =
-          causal_slam::core::TimeWindow{
-              .start_ns = start_ns,
-              .end_ns = start_ns + Ms(duration_ms),
-          },
-      .duration_ms = static_cast<double>(duration_ms),
-      .source = causal_slam::lidar::LidarScanWindowSource::kPointTimeField,
-      .confidence = causal_slam::lidar::LidarScanWindowConfidence::kHigh,
-      .reason = "precomputed_test_scan_window",
-  };
+  causal_slam::core::TimeWindow window;
+  window.start_ns = start_ns;
+  window.end_ns = start_ns + Ms(duration_ms);
+
+  causal_slam::lidar::LidarScanWindowEstimate estimate;
+  estimate.window = window;
+  estimate.duration_ms = static_cast<double>(duration_ms);
+  estimate.source =
+      causal_slam::lidar::LidarScanWindowSource::kPointTimeField;
+  estimate.confidence =
+      causal_slam::lidar::LidarScanWindowConfidence::kHigh;
+  estimate.reason = "precomputed_test_scan_window";
+  return estimate;
 }
 
 LidarPipelineInput MakeLidarInput(std::int64_t header_stamp_ns, std::int64_t receive_time_ns) {
@@ -72,40 +74,38 @@ LidarPipelineInput MakeLidarInput(std::int64_t header_stamp_ns, std::int64_t rec
   WriteValue<std::uint32_t>(&data, point_step, 1, 0, 50'000'000U);
   WriteValue<std::uint32_t>(&data, point_step, 2, 0, 100'000'000U);
 
-  return LidarPipelineInput{
-      .header_stamp_ns = header_stamp_ns,
-      .receive_time_ns = receive_time_ns,
-      .frame_id = "lidar",
-      .fields =
-          {
-              causal_slam::pointcloud::PointCloud2FieldInfo{
-                  .name = "offset_time",
-                  .offset = 0,
-                  .datatype = causal_slam::pointcloud::kPointCloud2Uint32,
-                  .count = 1,
-              },
-          },
-      .cloud_view =
-          causal_slam::pointcloud::PointCloud2CloudView{
-              .header_stamp_ns = header_stamp_ns,
-              .width = point_count,
-              .height = 1,
-              .point_step = point_step,
-              .data = data.data(),
-              .data_size = data.size(),
-          },
-      .precomputed_scan_window_estimate = std::nullopt,
-  };
+  causal_slam::pointcloud::PointCloud2FieldInfo field;
+  field.name = "offset_time";
+  field.offset = 0;
+  field.datatype = causal_slam::pointcloud::kPointCloud2Uint32;
+  field.count = 1;
+
+  causal_slam::pointcloud::PointCloud2CloudView cloud_view;
+  cloud_view.header_stamp_ns = header_stamp_ns;
+  cloud_view.width = point_count;
+  cloud_view.height = 1;
+  cloud_view.point_step = point_step;
+  cloud_view.data = data.data();
+  cloud_view.data_size = data.size();
+
+  LidarPipelineInput input;
+  input.header_stamp_ns = header_stamp_ns;
+  input.receive_time_ns = receive_time_ns;
+  input.frame_id = "lidar";
+  input.fields.push_back(field);
+  input.cloud_view = cloud_view;
+  input.precomputed_scan_window_estimate = std::nullopt;
+  return input;
 }
 
 TEST(TemporalMonitorPipelineTest, HealthyImuCoverageAllowsMapUpdate) {
   TemporalMonitorPipeline pipeline{MakeConfig()};
 
   for (std::int64_t t_ms = 1000; t_ms <= 1120; t_ms += 20) {
-    pipeline.ObserveImu(ImuPipelineInput{
-        .header_stamp_ns = Ms(t_ms),
-        .receive_time_ns = Ms(t_ms),
-    });
+    ImuPipelineInput imu_input;
+    imu_input.header_stamp_ns = Ms(t_ms);
+    imu_input.receive_time_ns = Ms(t_ms);
+    pipeline.ObserveImu(imu_input);
   }
 
   pipeline.ObserveLidar(MakeLidarInput(Ms(1000), Ms(1100)));
@@ -125,10 +125,10 @@ TEST(TemporalMonitorPipelineTest, UsesPrecomputedScanWindowEstimate) {
   TemporalMonitorPipeline pipeline{MakeConfig()};
 
   for (std::int64_t t_ms = 1000; t_ms <= 1180; t_ms += 20) {
-    pipeline.ObserveImu(ImuPipelineInput{
-        .header_stamp_ns = Ms(t_ms),
-        .receive_time_ns = Ms(t_ms),
-    });
+    ImuPipelineInput imu_input;
+    imu_input.header_stamp_ns = Ms(t_ms);
+    imu_input.receive_time_ns = Ms(t_ms);
+    pipeline.ObserveImu(imu_input);
   }
 
   auto lidar_input = MakeLidarInput(Ms(1000), Ms(1100));
@@ -172,10 +172,10 @@ TEST(TemporalMonitorPipelineTest, ExtractsPointTimeWhenPrecomputedScanWindowIsMi
   TemporalMonitorPipeline pipeline{MakeConfig()};
 
   for (std::int64_t t_ms = 1000; t_ms <= 1120; t_ms += 20) {
-    pipeline.ObserveImu(ImuPipelineInput{
-        .header_stamp_ns = Ms(t_ms),
-        .receive_time_ns = Ms(t_ms),
-    });
+    ImuPipelineInput imu_input;
+    imu_input.header_stamp_ns = Ms(t_ms);
+    imu_input.receive_time_ns = Ms(t_ms);
+    pipeline.ObserveImu(imu_input);
   }
 
   auto lidar_input = MakeLidarInput(Ms(1000), Ms(1100));
@@ -201,10 +201,10 @@ TEST(TemporalMonitorPipelineTest, PrecomputedScanWindowControlsImuCoverageWindow
   TemporalMonitorPipeline pipeline{MakeConfig()};
 
   for (std::int64_t t_ms = 1000; t_ms <= 1200; t_ms += 20) {
-    pipeline.ObserveImu(ImuPipelineInput{
-        .header_stamp_ns = Ms(t_ms),
-        .receive_time_ns = Ms(t_ms),
-    });
+    ImuPipelineInput imu_input;
+    imu_input.header_stamp_ns = Ms(t_ms);
+    imu_input.receive_time_ns = Ms(t_ms);
+    pipeline.ObserveImu(imu_input);
   }
 
   auto lidar_input = MakeLidarInput(Ms(1000), Ms(1100));

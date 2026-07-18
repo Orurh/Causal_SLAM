@@ -92,6 +92,12 @@ std::string OfflineTemporalReportConsoleRenderer::Render(const OfflineTemporalRe
   out << "  last_reason=" << summary.lidar_scan_windows.last_reason << "\n\n";
 
   out << "Offline IMU coverage:\n";
+  out << "  has_observed_imu_period_p95=" << (summary.imu_coverage.has_observed_imu_period_p95 ? "true" : "false") << "\n";
+  out << "  observed_imu_period_p95_ms=" << summary.imu_coverage.observed_imu_period_p95_ms << "\n";
+  out << "  configured_min_edge_tolerance_ms=" << summary.imu_coverage.configured_min_edge_tolerance_ms << "\n";
+  out << "  adaptive_edge_tolerance_ms=" << summary.imu_coverage.adaptive_edge_tolerance_ms << "\n";
+  out << "  effective_edge_tolerance_ms=" << summary.imu_coverage.effective_edge_tolerance_ms << "\n";
+  out << "  edge_tolerance_source=" << summary.imu_coverage.edge_tolerance_source << "\n";
   out << "  scans_total=" << summary.imu_coverage.scans_total << "\n";
   out << "  ok=" << summary.imu_coverage.ok << "\n";
   out << "  warning=" << summary.imu_coverage.warning << "\n";

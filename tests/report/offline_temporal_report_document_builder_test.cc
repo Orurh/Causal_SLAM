@@ -54,11 +54,11 @@ TEST(OfflineTemporalReportDocumentBuilderTest, BuildsCoreSections) {
   report.stream_timing_faults.fault_reasons["lidar_stream_timing_jitter_high"] = 1;
   report.stream_timing_faults.fault_reasons["lidar_stream_timing_short_period"] = 1;
 
-  report.topics.push_back(causal_slam::offline_analysis::TopicSummary{
-      .name = "/imu",
-      .type = "sensor_msgs/msg/Imu",
-      .message_count = 44398,
-  });
+  causal_slam::offline_analysis::TopicSummary topic;
+  topic.name = "/imu";
+  topic.type = "sensor_msgs/msg/Imu";
+  topic.message_count = 44398;
+  report.topics.push_back(topic);
 
   const OfflineTemporalReportDocumentBuilder builder;
   const ReportDocument document = builder.Build(report);

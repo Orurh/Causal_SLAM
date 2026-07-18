@@ -12,13 +12,17 @@
 namespace causal_slam::pointcloud {
 namespace {
 
-PointCloud2FieldInfo Field(std::string name, std::uint32_t offset, std::uint8_t datatype, std::uint32_t count = 1) {
-  return PointCloud2FieldInfo{
-      .name = std::move(name),
-      .offset = offset,
-      .datatype = datatype,
-      .count = count,
-  };
+PointCloud2FieldInfo Field(
+    std::string name,
+    std::uint32_t offset,
+    std::uint8_t datatype,
+    std::uint32_t count = 1) {
+  PointCloud2FieldInfo field;
+  field.name = std::move(name);
+  field.offset = offset;
+  field.datatype = datatype;
+  field.count = count;
+  return field;
 }
 
 TEST(PointCloud2FieldInspectorCoreTest, EmptyFieldsHaveNoTimeCandidate) {

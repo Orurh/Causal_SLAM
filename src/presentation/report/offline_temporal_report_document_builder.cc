@@ -16,7 +16,10 @@ std::string ToReportString(const T& value) {
 }
 
 ReportMetric Metric(std::string name, std::string value) {
-  return ReportMetric{.name = std::move(name), .value = std::move(value)};
+  ReportMetric metric;
+  metric.name = std::move(name);
+  metric.value = std::move(value);
+  return metric;
 }
 
 ReportSection MakeSection(std::string id, std::string title, std::string empty_message = "none") {
@@ -155,6 +158,13 @@ ReportSection BuildLidarScanWindowsSection(const causal_slam::offline_analysis::
 ReportSection BuildImuCoverageSection(const causal_slam::offline_analysis::OfflineTemporalReport& report) {
   const auto& coverage = report.imu_coverage;
   auto section = MakeSection("imu_coverage", "Offline IMU coverage");
+
+  section.metrics.push_back(Metric("has_observed_imu_period_p95", ToReportString(coverage.has_observed_imu_period_p95)));
+  section.metrics.push_back(Metric("observed_imu_period_p95_ms", ToReportString(coverage.observed_imu_period_p95_ms)));
+  section.metrics.push_back(Metric("configured_min_edge_tolerance_ms", ToReportString(coverage.configured_min_edge_tolerance_ms)));
+  section.metrics.push_back(Metric("adaptive_edge_tolerance_ms", ToReportString(coverage.adaptive_edge_tolerance_ms)));
+  section.metrics.push_back(Metric("effective_edge_tolerance_ms", ToReportString(coverage.effective_edge_tolerance_ms)));
+  section.metrics.push_back(Metric("edge_tolerance_source", coverage.edge_tolerance_source));
 
   section.metrics.push_back(Metric("scans_total", ToReportString(coverage.scans_total)));
   section.metrics.push_back(Metric("ok", ToReportString(coverage.ok)));

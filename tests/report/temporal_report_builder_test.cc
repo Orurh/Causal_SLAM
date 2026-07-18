@@ -48,10 +48,11 @@ TEST(TemporalReportBuilderTest, BuildsTransformChecksSection) {
   snapshot.observation.transform_ages.push_back(summary);
 
   const TemporalReportBuilder builder;
-  const causal_slam::policy::MapUpdateDecision decision{
-      .map_update_allowed = false,
-      .reason = causal_slam::policy::MapUpdateDecisionReason::kTemporalHealthDegraded,
-  };
+  causal_slam::policy::MapUpdateDecision decision;
+  decision.map_update_allowed = false;
+  decision.reason =
+      causal_slam::policy::MapUpdateDecisionReason::
+          kTemporalHealthDegraded;
 
   const auto document = builder.BuildDiagnosticsReport(snapshot, decision);
 

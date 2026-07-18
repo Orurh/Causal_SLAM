@@ -20,56 +20,59 @@ void WriteValue(std::vector<std::uint8_t>* data, std::uint32_t point_step, std::
   std::memcpy(data->data() + byte_offset, &value, sizeof(T));
 }
 
-PointCloud2CloudView MakeView(std::int64_t header_stamp_ns, std::uint32_t point_count, std::uint32_t point_step,
-                              const std::vector<std::uint8_t>& data) {
-  return PointCloud2CloudView{
-      .header_stamp_ns = header_stamp_ns,
-      .width = point_count,
-      .height = 1,
-      .point_step = point_step,
-      .data = data.empty() ? nullptr : data.data(),
-      .data_size = data.size(),
-  };
+PointCloud2CloudView MakeView(
+    std::int64_t header_stamp_ns,
+    std::uint32_t point_count,
+    std::uint32_t point_step,
+    const std::vector<std::uint8_t>& data) {
+  PointCloud2CloudView view;
+  view.header_stamp_ns = header_stamp_ns;
+  view.width = point_count;
+  view.height = 1;
+  view.point_step = point_step;
+  view.data = data.empty() ? nullptr : data.data();
+  view.data_size = data.size();
+  return view;
 }
 
 PointCloud2FieldInfo TimestampFloat64Field(std::uint32_t offset) {
-  return PointCloud2FieldInfo{
-      .name = "timestamp",
-      .offset = offset,
-      .datatype = kPointCloud2Float64,
-      .count = 1,
-      .time_role = PointCloud2TimeFieldRole::kPointTime,
-  };
+  PointCloud2FieldInfo field;
+  field.name = "timestamp";
+  field.offset = offset;
+  field.datatype = kPointCloud2Float64;
+  field.count = 1;
+  field.time_role = PointCloud2TimeFieldRole::kPointTime;
+  return field;
 }
 
 PointCloud2FieldInfo TimestampFloat32Field(std::uint32_t offset) {
-  return PointCloud2FieldInfo{
-      .name = "timestamp",
-      .offset = offset,
-      .datatype = kPointCloud2Float32,
-      .count = 1,
-      .time_role = PointCloud2TimeFieldRole::kPointTime,
-  };
+  PointCloud2FieldInfo field;
+  field.name = "timestamp";
+  field.offset = offset;
+  field.datatype = kPointCloud2Float32;
+  field.count = 1;
+  field.time_role = PointCloud2TimeFieldRole::kPointTime;
+  return field;
 }
 
 PointCloud2FieldInfo OffsetTimeUint32Field(std::uint32_t offset) {
-  return PointCloud2FieldInfo{
-      .name = "offset_time",
-      .offset = offset,
-      .datatype = kPointCloud2Uint32,
-      .count = 1,
-      .time_role = PointCloud2TimeFieldRole::kPointOffsetTime,
-  };
+  PointCloud2FieldInfo field;
+  field.name = "offset_time";
+  field.offset = offset;
+  field.datatype = kPointCloud2Uint32;
+  field.count = 1;
+  field.time_role = PointCloud2TimeFieldRole::kPointOffsetTime;
+  return field;
 }
 
 PointCloud2FieldInfo OusterTUint32Field(std::uint32_t offset) {
-  return PointCloud2FieldInfo{
-      .name = "t",
-      .offset = offset,
-      .datatype = kPointCloud2Uint32,
-      .count = 1,
-      .time_role = PointCloud2TimeFieldRole::kPointOffsetTime,
-  };
+  PointCloud2FieldInfo field;
+  field.name = "t";
+  field.offset = offset;
+  field.datatype = kPointCloud2Uint32;
+  field.count = 1;
+  field.time_role = PointCloud2TimeFieldRole::kPointOffsetTime;
+  return field;
 }
 
 TEST(PointCloud2TimeFieldExtractorCoreTest, ExtractsAbsoluteTimestampFloat64Window) {

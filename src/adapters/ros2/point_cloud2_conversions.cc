@@ -15,26 +15,26 @@ std::vector<causal_slam::pointcloud::PointCloud2FieldInfo> ToPointCloud2FieldInf
   fields.reserve(cloud.fields.size());
 
   for (const auto& field : cloud.fields) {
-    fields.push_back(causal_slam::pointcloud::PointCloud2FieldInfo{
-        .name = field.name,
-        .offset = field.offset,
-        .datatype = field.datatype,
-        .count = field.count,
-    });
+    causal_slam::pointcloud::PointCloud2FieldInfo field_info;
+    field_info.name = field.name;
+    field_info.offset = field.offset;
+    field_info.datatype = field.datatype;
+    field_info.count = field.count;
+    fields.push_back(field_info);
   }
 
   return fields;
 }
 
 causal_slam::pointcloud::PointCloud2CloudView ToPointCloud2CloudView(const sensor_msgs::msg::PointCloud2& cloud) {
-  return causal_slam::pointcloud::PointCloud2CloudView{
-      .header_stamp_ns = HeaderStampToNanoseconds(cloud.header.stamp),
-      .width = cloud.width,
-      .height = cloud.height,
-      .point_step = cloud.point_step,
-      .data = cloud.data.empty() ? nullptr : cloud.data.data(),
-      .data_size = cloud.data.size(),
-  };
+  causal_slam::pointcloud::PointCloud2CloudView view;
+  view.header_stamp_ns = HeaderStampToNanoseconds(cloud.header.stamp);
+  view.width = cloud.width;
+  view.height = cloud.height;
+  view.point_step = cloud.point_step;
+  view.data = cloud.data.empty() ? nullptr : cloud.data.data();
+  view.data_size = cloud.data.size();
+  return view;
 }
 
 }  // namespace causal_slam::ros_adapters

@@ -12,10 +12,10 @@ std::int64_t Ms(std::int64_t milliseconds) {
 }
 
 TEST(LidarScanWindowEstimatorTest, FirstScanUsesFallbackDuration) {
-  LidarScanWindowEstimator estimator{LidarScanWindowEstimatorConfig{
-      .fallback_scan_duration_ms = 100.0,
-      .stamp_policy = LidarStampPolicy::kScanEnd,
-  }};
+  LidarScanWindowEstimatorConfig config;
+  config.fallback_scan_duration_ms = 100.0;
+  config.stamp_policy = LidarStampPolicy::kScanEnd;
+  LidarScanWindowEstimator estimator{config};
 
   const auto estimate = estimator.Estimate(Ms(1000));
 
@@ -28,10 +28,10 @@ TEST(LidarScanWindowEstimatorTest, FirstScanUsesFallbackDuration) {
 }
 
 TEST(LidarScanWindowEstimatorTest, SecondScanUsesMeasuredHeaderPeriod) {
-  LidarScanWindowEstimator estimator{LidarScanWindowEstimatorConfig{
-      .fallback_scan_duration_ms = 100.0,
-      .stamp_policy = LidarStampPolicy::kScanEnd,
-  }};
+  LidarScanWindowEstimatorConfig config;
+  config.fallback_scan_duration_ms = 100.0;
+  config.stamp_policy = LidarStampPolicy::kScanEnd;
+  LidarScanWindowEstimator estimator{config};
 
   (void)estimator.Estimate(Ms(1000));
   const auto estimate = estimator.Estimate(Ms(1110));
@@ -45,10 +45,10 @@ TEST(LidarScanWindowEstimatorTest, SecondScanUsesMeasuredHeaderPeriod) {
 }
 
 TEST(LidarScanWindowEstimatorTest, ReorderedStampFallsBackToFixedDuration) {
-  LidarScanWindowEstimator estimator{LidarScanWindowEstimatorConfig{
-      .fallback_scan_duration_ms = 100.0,
-      .stamp_policy = LidarStampPolicy::kScanEnd,
-  }};
+  LidarScanWindowEstimatorConfig config;
+  config.fallback_scan_duration_ms = 100.0;
+  config.stamp_policy = LidarStampPolicy::kScanEnd;
+  LidarScanWindowEstimator estimator{config};
 
   (void)estimator.Estimate(Ms(1000));
   const auto estimate = estimator.Estimate(Ms(990));
@@ -62,12 +62,12 @@ TEST(LidarScanWindowEstimatorTest, ReorderedStampFallsBackToFixedDuration) {
 }
 
 TEST(LidarScanWindowEstimatorTest, OutOfRangeMeasuredPeriodFallsBack) {
-  LidarScanWindowEstimator estimator{LidarScanWindowEstimatorConfig{
-      .fallback_scan_duration_ms = 100.0,
-      .min_measured_scan_duration_ms = 10.0,
-      .max_measured_scan_duration_ms = 200.0,
-      .stamp_policy = LidarStampPolicy::kScanEnd,
-  }};
+  LidarScanWindowEstimatorConfig config;
+  config.fallback_scan_duration_ms = 100.0;
+  config.min_measured_scan_duration_ms = 10.0;
+  config.max_measured_scan_duration_ms = 200.0;
+  config.stamp_policy = LidarStampPolicy::kScanEnd;
+  LidarScanWindowEstimator estimator{config};
 
   (void)estimator.Estimate(Ms(1000));
   const auto estimate = estimator.Estimate(Ms(1500));
@@ -81,10 +81,10 @@ TEST(LidarScanWindowEstimatorTest, OutOfRangeMeasuredPeriodFallsBack) {
 }
 
 TEST(LidarScanWindowEstimatorTest, MeasuredPeriodSupportsScanMiddlePolicy) {
-  LidarScanWindowEstimator estimator{LidarScanWindowEstimatorConfig{
-      .fallback_scan_duration_ms = 100.0,
-      .stamp_policy = LidarStampPolicy::kScanMiddle,
-  }};
+  LidarScanWindowEstimatorConfig config;
+  config.fallback_scan_duration_ms = 100.0;
+  config.stamp_policy = LidarStampPolicy::kScanMiddle;
+  LidarScanWindowEstimator estimator{config};
 
   (void)estimator.Estimate(Ms(1000));
   const auto estimate = estimator.Estimate(Ms(1100));
@@ -97,11 +97,11 @@ TEST(LidarScanWindowEstimatorTest, MeasuredPeriodSupportsScanMiddlePolicy) {
 }
 
 TEST(LidarScanWindowEstimatorTest, CanDisableMeasuredHeaderPeriod) {
-  LidarScanWindowEstimator estimator{LidarScanWindowEstimatorConfig{
-      .fallback_scan_duration_ms = 100.0,
-      .stamp_policy = LidarStampPolicy::kScanEnd,
-      .prefer_measured_header_period = false,
-  }};
+  LidarScanWindowEstimatorConfig config;
+  config.fallback_scan_duration_ms = 100.0;
+  config.stamp_policy = LidarStampPolicy::kScanEnd;
+  config.prefer_measured_header_period = false;
+  LidarScanWindowEstimator estimator{config};
 
   (void)estimator.Estimate(Ms(1000));
   const auto estimate = estimator.Estimate(Ms(1200));

@@ -3,7 +3,7 @@ CompileFlags:
   Add:
     - -I/opt/ros/jazzy/include
     - -I${workspaceFolder}/src/causal_slam/src
-    - --std=c++23
+    - --std=c++17
   Remove:
     - -fcolor-diagnostics
     - -fdiagnostics-color

@@ -58,12 +58,11 @@ TEST(OfflineTemporalReportConsoleRendererTest, RendersVerdictAndCoverageSummary)
   report.imu_coverage.worst_reason = "imu_window_empty";
   report.imu_coverage.fault_reasons["imu_window_empty"] = 5;
 
-  const OfflineTemporalReportConsoleRenderContext context{
-      .bag_path = "/tmp/hard_bag",
-      .report_path = "/tmp/report.json",
-      .lidar_topic = "/points2/decompressed",
-      .imu_topic = "/imu",
-  };
+  OfflineTemporalReportConsoleRenderContext context;
+  context.bag_path = "/tmp/hard_bag";
+  context.report_path = "/tmp/report.json";
+  context.lidar_topic = "/points2/decompressed";
+  context.imu_topic = "/imu";
 
   const OfflineTemporalReportConsoleRenderer renderer;
   const std::string text = renderer.Render(context, report);

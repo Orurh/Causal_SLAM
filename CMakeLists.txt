@@ -8,7 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic -Werror=return-type)
+  add_compile_options(-Wall -Wextra -Wpedantic -Werror=return-type -Werror=c++20-extensions)
 endif()
 
 find_package(ament_cmake REQUIRED)

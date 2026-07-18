@@ -82,10 +82,10 @@ void ImuCoverageAnalyzer::SetConfig(const ImuCoverageConfig& config) {
 ImuCoverageSummary ImuCoverageAnalyzer::AnalyzeStamps(const causal_slam::core::TimeWindow scan_window,
                                                       std::vector<std::int64_t> stamps) const {
   if (!scan_window.IsValid() || scan_window.DurationNs() <= 0) {
-    return ImuCoverageSummary{
-        .health = ImuCoverageHealth::kDegraded,
-        .reason = "invalid_scan_window",
-    };
+    ImuCoverageSummary summary;
+    summary.health = ImuCoverageHealth::kDegraded;
+    summary.reason = "invalid_scan_window";
+    return summary;
   }
 
   std::sort(stamps.begin(), stamps.end());
@@ -93,15 +93,15 @@ ImuCoverageSummary ImuCoverageAnalyzer::AnalyzeStamps(const causal_slam::core::T
   const double scan_duration_ms = causal_slam::core::NanosecondsToMilliseconds(scan_window.DurationNs());
 
   if (stamps.empty()) {
-    return ImuCoverageSummary{
-        .imu_count_in_window = 0,
-        .missing_prefix_ms = scan_duration_ms,
-        .missing_suffix_ms = scan_duration_ms,
-        .max_gap_inside_ms = 0.0,
-        .coverage_ratio = 0.0,
-        .health = ImuCoverageHealth::kDegraded,
-        .reason = "imu_window_empty",
-    };
+    ImuCoverageSummary summary;
+    summary.imu_count_in_window = 0;
+    summary.missing_prefix_ms = scan_duration_ms;
+    summary.missing_suffix_ms = scan_duration_ms;
+    summary.max_gap_inside_ms = 0.0;
+    summary.coverage_ratio = 0.0;
+    summary.health = ImuCoverageHealth::kDegraded;
+    summary.reason = "imu_window_empty";
+    return summary;
   }
 
   const std::int64_t first_imu_ns = stamps.front();
@@ -114,13 +114,12 @@ ImuCoverageSummary ImuCoverageAnalyzer::AnalyzeStamps(const causal_slam::core::T
   const double covered_ms = scan_duration_ms - missing_prefix_ms - missing_suffix_ms;
   const double coverage_ratio = scan_duration_ms > 0.0 ? ClampRatio(covered_ms / scan_duration_ms) : 0.0;
 
-  auto summary = ImuCoverageSummary{
-      .imu_count_in_window = static_cast<std::uint64_t>(stamps.size()),
-      .missing_prefix_ms = missing_prefix_ms,
-      .missing_suffix_ms = missing_suffix_ms,
-      .max_gap_inside_ms = max_gap_inside_ms,
-      .coverage_ratio = coverage_ratio,
-  };
+  ImuCoverageSummary summary;
+  summary.imu_count_in_window = static_cast<std::uint64_t>(stamps.size());
+  summary.missing_prefix_ms = missing_prefix_ms;
+  summary.missing_suffix_ms = missing_suffix_ms;
+  summary.max_gap_inside_ms = max_gap_inside_ms;
+  summary.coverage_ratio = coverage_ratio;
 
   return EvaluateCoverageHealth(std::move(summary), config_);
 }

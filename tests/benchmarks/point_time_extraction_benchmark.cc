@@ -42,22 +42,23 @@ std::vector<std::uint8_t> MakeCloudData(std::uint32_t point_count) {
 void RunCase(std::uint32_t point_count, int iterations) {
   const auto data = MakeCloudData(point_count);
 
-  const causal_slam::pointcloud::PointCloud2CloudView cloud{
-      .header_stamp_ns = kHeaderStampNs,
-      .width = point_count,
-      .height = 1,
-      .point_step = kPointStep,
-      .data = data.data(),
-      .data_size = data.size(),
-  };
+  causal_slam::pointcloud::PointCloud2CloudView cloud;
+  cloud.header_stamp_ns = kHeaderStampNs;
+  cloud.width = point_count;
+  cloud.height = 1;
+  cloud.point_step = kPointStep;
+  cloud.data = data.data();
+  cloud.data_size = data.size();
 
-  const causal_slam::pointcloud::PointCloud2FieldInfo time_field{
-      .name = "offset_time",
-      .offset = kOffsetTimeFieldOffset,
-      .datatype = causal_slam::pointcloud::kPointCloud2Uint32,
-      .count = 1,
-      .time_role = causal_slam::pointcloud::PointCloud2TimeFieldRole::kPointOffsetTime,
-  };
+  causal_slam::pointcloud::PointCloud2FieldInfo time_field;
+  time_field.name = "offset_time";
+  time_field.offset = kOffsetTimeFieldOffset;
+  time_field.datatype =
+      causal_slam::pointcloud::kPointCloud2Uint32;
+  time_field.count = 1;
+  time_field.time_role =
+      causal_slam::pointcloud::PointCloud2TimeFieldRole::
+          kPointOffsetTime;
 
   const causal_slam::pointcloud::PointCloud2TimeFieldExtractor extractor;
 

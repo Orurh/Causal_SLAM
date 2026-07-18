@@ -65,10 +65,10 @@ std::vector<TransformCheckConfig> BuildTransformChecks(const std::vector<std::st
   checks.reserve(target_frames.size());
 
   for (std::size_t i = 0; i < target_frames.size(); ++i) {
-    checks.push_back(TransformCheckConfig{
-        .target_frame = target_frames[i],
-        .source_frame = source_frames[i],
-    });
+    TransformCheckConfig check;
+    check.target_frame = target_frames[i];
+    check.source_frame = source_frames[i];
+    checks.push_back(check);
   }
 
   return checks;
@@ -242,24 +242,18 @@ TemporalMonitorNodeParameters LoadTemporalMonitorNodeParameters(rclcpp::Node& no
   params.pipeline_config.imu_gap_threshold_ms = params.imu_gap_threshold_ms;
   params.pipeline_config.lidar_gap_threshold_ms = params.lidar_gap_threshold_ms;
   params.pipeline_config.imu_buffer_retention_ns = core::MillisecondsToNanoseconds(std::max(params.imu_buffer_retention_ms, 0.0));
-  params.pipeline_config.lidar_scan_window = lidar::LidarScanWindowEstimatorConfig{
-      .fallback_scan_duration_ms = params.lidar_scan_duration_ms,
-      .min_measured_scan_duration_ms = params.lidar_min_measured_scan_duration_ms,
-      .max_measured_scan_duration_ms = params.lidar_max_measured_scan_duration_ms,
-      .stamp_policy = params.lidar_stamp_policy,
-      .prefer_measured_header_period = params.lidar_prefer_measured_header_period,
-  };
-  params.pipeline_config.point_time = pointcloud::PointCloud2TimeFieldOverrideConfig{
-      .mode = ParsePointTimeMode(params.lidar_point_time_mode),
-      .field_name = params.lidar_point_time_field,
-      .interpretation = ParsePointTimeInterpretation(params.lidar_point_time_interpretation),
-      .unit = ParsePointTimeUnit(params.lidar_point_time_unit),
-  };
-  params.pipeline_config.imu_coverage = coverage::ImuCoverageConfig{
-      .max_missing_prefix_ms = params.max_missing_prefix_ms,
-      .max_missing_suffix_ms = params.max_missing_suffix_ms,
-      .max_internal_gap_ms = params.max_internal_gap_ms,
-  };
+  params.pipeline_config.lidar_scan_window.fallback_scan_duration_ms = params.lidar_scan_duration_ms;
+  params.pipeline_config.lidar_scan_window.min_measured_scan_duration_ms = params.lidar_min_measured_scan_duration_ms;
+  params.pipeline_config.lidar_scan_window.max_measured_scan_duration_ms = params.lidar_max_measured_scan_duration_ms;
+  params.pipeline_config.lidar_scan_window.stamp_policy = params.lidar_stamp_policy;
+  params.pipeline_config.lidar_scan_window.prefer_measured_header_period = params.lidar_prefer_measured_header_period;
+  params.pipeline_config.point_time.mode = ParsePointTimeMode(params.lidar_point_time_mode);
+  params.pipeline_config.point_time.field_name = params.lidar_point_time_field;
+  params.pipeline_config.point_time.interpretation = ParsePointTimeInterpretation(params.lidar_point_time_interpretation);
+  params.pipeline_config.point_time.unit = ParsePointTimeUnit(params.lidar_point_time_unit);
+  params.pipeline_config.imu_coverage.max_missing_prefix_ms = params.max_missing_prefix_ms;
+  params.pipeline_config.imu_coverage.max_missing_suffix_ms = params.max_missing_suffix_ms;
+  params.pipeline_config.imu_coverage.max_internal_gap_ms = params.max_internal_gap_ms;
   params.pipeline_config.transform_age.max_transform_age_ms = params.tf_max_transform_age_ms;
   params.pipeline_config.transform_age.max_future_tolerance_ms = params.tf_max_future_tolerance_ms;
 

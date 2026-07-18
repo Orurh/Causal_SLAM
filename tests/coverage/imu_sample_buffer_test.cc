@@ -12,9 +12,9 @@ std::int64_t Ms(const std::int64_t milliseconds) {
 }
 
 ImuSample ImuAtMs(const std::int64_t timestamp_ms) {
-  return ImuSample{
-      .stamp_ns = Ms(timestamp_ms),
-  };
+  ImuSample sample;
+  sample.stamp_ns = Ms(timestamp_ms);
+  return sample;
 }
 
 TEST(ImuSampleBufferTest, KeepsSamplesWithinRetentionWindow) {

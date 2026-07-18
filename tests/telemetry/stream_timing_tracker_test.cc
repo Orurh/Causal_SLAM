@@ -15,10 +15,11 @@ std::int64_t Ms(const std::int64_t milliseconds) {
 
 TimingSample SampleAtMs(const std::int64_t stamp_ms) {
   const std::int64_t stamp_ns = Ms(stamp_ms);
-  return TimingSample{
-      .header_stamp_ns = stamp_ns,
-      .receive_time_ns = stamp_ns + kDelayNs,
-  };
+
+  TimingSample sample;
+  sample.header_stamp_ns = stamp_ns;
+  sample.receive_time_ns = stamp_ns + kDelayNs;
+  return sample;
 }
 
 TEST(StreamTimingTrackerTest, RegularHundredHzWindowIsOk) {

@@ -13,24 +13,26 @@ std::int64_t Ms(const std::int64_t milliseconds) {
 }
 
 ImuSample ImuAtMs(const std::int64_t timestamp_ms) {
-  return ImuSample{
-      .stamp_ns = Ms(timestamp_ms),
-  };
+  ImuSample sample;
+  sample.stamp_ns = Ms(timestamp_ms);
+  return sample;
 }
 
-causal_slam::core::TimeWindow WindowMs(const std::int64_t start_ms, const std::int64_t end_ms) {
-  return causal_slam::core::TimeWindow{
-      .start_ns = Ms(start_ms),
-      .end_ns = Ms(end_ms),
-  };
+causal_slam::core::TimeWindow WindowMs(
+    const std::int64_t start_ms,
+    const std::int64_t end_ms) {
+  causal_slam::core::TimeWindow window;
+  window.start_ns = Ms(start_ms);
+  window.end_ns = Ms(end_ms);
+  return window;
 }
 
 TEST(ImuCoverageAnalyzerTest, FullCoverageIsOk) {
-  const ImuCoverageAnalyzer analyzer{ImuCoverageConfig{
-      .max_missing_prefix_ms = 5.0,
-      .max_missing_suffix_ms = 5.0,
-      .max_internal_gap_ms = 30.0,
-  }};
+  ImuCoverageConfig config;
+  config.max_missing_prefix_ms = 5.0;
+  config.max_missing_suffix_ms = 5.0;
+  config.max_internal_gap_ms = 30.0;
+  const ImuCoverageAnalyzer analyzer{config};
 
   const std::vector<ImuSample> samples{
       ImuAtMs(1000), ImuAtMs(1020), ImuAtMs(1040), ImuAtMs(1060), ImuAtMs(1080), ImuAtMs(1100),
@@ -78,11 +80,11 @@ TEST(ImuCoverageAnalyzerTest, MissingSuffixDegradesCoverage) {
 }
 
 TEST(ImuCoverageAnalyzerTest, InternalGapDegradesCoverage) {
-  const ImuCoverageAnalyzer analyzer{ImuCoverageConfig{
-      .max_missing_prefix_ms = 5.0,
-      .max_missing_suffix_ms = 5.0,
-      .max_internal_gap_ms = 30.0,
-  }};
+  ImuCoverageConfig config;
+  config.max_missing_prefix_ms = 5.0;
+  config.max_missing_suffix_ms = 5.0;
+  config.max_internal_gap_ms = 30.0;
+  const ImuCoverageAnalyzer analyzer{config};
 
   const std::vector<ImuSample> samples{
       ImuAtMs(1000),

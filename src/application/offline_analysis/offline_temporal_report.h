@@ -102,6 +102,14 @@ struct OfflineImuCoverageReport {
   std::uint64_t missing_prefix_count = 0;
   std::uint64_t missing_suffix_count = 0;
   std::uint64_t internal_gap_count = 0;
+
+  bool has_observed_imu_period_p95 = false;
+  double observed_imu_period_p95_ms = 0.0;
+  double configured_min_edge_tolerance_ms = 0.0;
+  double adaptive_edge_tolerance_ms = 0.0;
+  double effective_edge_tolerance_ms = 0.0;
+  std::string edge_tolerance_source = "configured_minimum";
+
   std::uint64_t min_imu_count_in_window = 0;
   std::uint64_t max_imu_count_in_window = 0;
   double mean_imu_count_in_window = 0.0;

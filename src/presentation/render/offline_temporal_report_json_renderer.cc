@@ -255,6 +255,14 @@ std::string OfflineTemporalReportJsonRenderer::Render(const OfflineTemporalRepor
 
   const auto& coverage = summary.imu_coverage;
   report << "  \"imu_coverage\": {\n";
+  report << "    \"has_observed_imu_period_p95\": " << (coverage.has_observed_imu_period_p95 ? "true" : "false") << ",\n";
+  report << "    \"observed_imu_period_p95_ms\": " << coverage.observed_imu_period_p95_ms << ",\n";
+  report << "    \"configured_min_edge_tolerance_ms\": " << coverage.configured_min_edge_tolerance_ms << ",\n";
+  report << "    \"adaptive_edge_tolerance_ms\": " << coverage.adaptive_edge_tolerance_ms << ",\n";
+  report << "    \"effective_edge_tolerance_ms\": " << coverage.effective_edge_tolerance_ms << ",\n";
+  report << "    \"edge_tolerance_source\": ";
+  WriteJsonString(report, coverage.edge_tolerance_source);
+  report << ",\n";
   report << "    \"scans_total\": " << coverage.scans_total << ",\n";
   report << "    \"ok\": " << coverage.ok << ",\n";
   report << "    \"warning\": " << coverage.warning << ",\n";

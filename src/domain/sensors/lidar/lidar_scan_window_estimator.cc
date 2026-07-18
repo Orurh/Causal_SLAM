@@ -78,25 +78,25 @@ LidarScanWindowEstimate LidarScanWindowEstimator::Estimate(std::int64_t header_s
     return BuildFallbackEstimate(header_stamp_ns, "measured_header_period_out_of_range");
   }
 
-  return LidarScanWindowEstimate{
-      .window = BuildLidarScanWindow(header_stamp_ns, measured_duration_ms, config_.stamp_policy),
-      .duration_ms = measured_duration_ms,
-      .source = LidarScanWindowSource::kMeasuredHeaderPeriod,
-      .confidence = LidarScanWindowConfidence::kMedium,
-      .reason = "measured_header_period",
-  };
+  LidarScanWindowEstimate estimate;
+  estimate.window = BuildLidarScanWindow(header_stamp_ns, measured_duration_ms, config_.stamp_policy);
+  estimate.duration_ms = measured_duration_ms;
+  estimate.source = LidarScanWindowSource::kMeasuredHeaderPeriod;
+  estimate.confidence = LidarScanWindowConfidence::kMedium;
+  estimate.reason = "measured_header_period";
+  return estimate;
 }
 
 LidarScanWindowEstimate LidarScanWindowEstimator::BuildFallbackEstimate(std::int64_t header_stamp_ns, std::string reason) const {
   const double fallback_duration_ms = SanitizePositiveDurationMs(config_.fallback_scan_duration_ms, 100.0);
 
-  return LidarScanWindowEstimate{
-      .window = BuildLidarScanWindow(header_stamp_ns, fallback_duration_ms, config_.stamp_policy),
-      .duration_ms = fallback_duration_ms,
-      .source = LidarScanWindowSource::kAssumedFixedDuration,
-      .confidence = LidarScanWindowConfidence::kLow,
-      .reason = std::move(reason),
-  };
+  LidarScanWindowEstimate estimate;
+  estimate.window = BuildLidarScanWindow(header_stamp_ns, fallback_duration_ms, config_.stamp_policy);
+  estimate.duration_ms = fallback_duration_ms;
+  estimate.source = LidarScanWindowSource::kAssumedFixedDuration;
+  estimate.confidence = LidarScanWindowConfidence::kLow;
+  estimate.reason = std::move(reason);
+  return estimate;
 }
 
 }  // namespace causal_slam::lidar

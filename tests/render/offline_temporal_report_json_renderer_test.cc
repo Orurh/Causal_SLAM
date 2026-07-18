@@ -32,11 +32,10 @@ TEST(OfflineTemporalReportJsonRendererTest, RendersTopLevelSchemaAndVerdict) {
   report.stream_timing_faults.fault_reasons["lidar_stream_timing_jitter_high"] = 1;
   report.stream_timing_faults.fault_reasons["lidar_stream_timing_short_period"] = 1;
 
-  const OfflineTemporalReportRenderContext context{
-      .bag_path = "/tmp/test_bag",
-      .lidar_topic = "/points",
-      .imu_topic = "/imu",
-  };
+  OfflineTemporalReportRenderContext context;
+  context.bag_path = "/tmp/test_bag";
+  context.lidar_topic = "/points";
+  context.imu_topic = "/imu";
 
   const OfflineTemporalReportJsonRenderer renderer;
   const std::string json = renderer.Render(context, report);
@@ -74,11 +73,10 @@ TEST(OfflineTemporalReportJsonRendererTest, RendersTopLevelSchemaAndVerdict) {
 TEST(OfflineTemporalReportJsonRendererTest, EscapesContextStrings) {
   OfflineTemporalReport report;
 
-  const OfflineTemporalReportRenderContext context{
-      .bag_path = "/tmp/bag \"quoted\"",
-      .lidar_topic = "/points\\escaped",
-      .imu_topic = "/imu\nnewline",
-  };
+  OfflineTemporalReportRenderContext context;
+  context.bag_path = "/tmp/bag \"quoted\"";
+  context.lidar_topic = "/points\\escaped";
+  context.imu_topic = "/imu\nnewline";
 
   const OfflineTemporalReportJsonRenderer renderer;
   const std::string json = renderer.Render(context, report);

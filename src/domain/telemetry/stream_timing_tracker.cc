@@ -112,21 +112,20 @@ void StreamTimingTracker::Observe(const TimingSample& sample) {
 TimingSummary StreamTimingTracker::LifetimeSummary() const {
   const double average_delay_ms = count_ > 0 ? delay_sum_ms_ / static_cast<double>(count_) : 0.0;
 
-  auto summary = TimingSummary{
-      .total_count = count_,
-      .window_count = count_,
-      .last_delay_ms = last_delay_ms_,
-      .window_average_delay_ms = average_delay_ms,
-      .window_max_delay_ms = max_delay_ms_,
-      .last_period_ms = last_period_ms_,
-      .last_jitter_ms = last_jitter_ms_,
-      .window_max_jitter_ms = max_jitter_ms_,
-      .total_reordered_count = reordered_count_,
-      .window_reordered_count = reordered_count_,
-      .total_gap_count = gap_count_,
-      .window_gap_count = gap_count_,
-      .max_gap_ms = max_gap_ms_,
-  };
+  TimingSummary summary;
+  summary.total_count = count_;
+  summary.window_count = count_;
+  summary.last_delay_ms = last_delay_ms_;
+  summary.window_average_delay_ms = average_delay_ms;
+  summary.window_max_delay_ms = max_delay_ms_;
+  summary.last_period_ms = last_period_ms_;
+  summary.last_jitter_ms = last_jitter_ms_;
+  summary.window_max_jitter_ms = max_jitter_ms_;
+  summary.total_reordered_count = reordered_count_;
+  summary.window_reordered_count = reordered_count_;
+  summary.total_gap_count = gap_count_;
+  summary.window_gap_count = gap_count_;
+  summary.max_gap_ms = max_gap_ms_;
 
   return EvaluateHealth(std::move(summary));
 }
@@ -134,21 +133,20 @@ TimingSummary StreamTimingTracker::LifetimeSummary() const {
 TimingSummary StreamTimingTracker::CurrentWindowSummary() const {
   const double window_average_delay_ms = window_count_ > 0 ? window_delay_sum_ms_ / static_cast<double>(window_count_) : 0.0;
 
-  auto summary = TimingSummary{
-      .total_count = count_,
-      .window_count = window_count_,
-      .last_delay_ms = last_delay_ms_,
-      .window_average_delay_ms = window_average_delay_ms,
-      .window_max_delay_ms = window_max_delay_ms_,
-      .last_period_ms = last_period_ms_,
-      .last_jitter_ms = last_jitter_ms_,
-      .window_max_jitter_ms = window_max_jitter_ms_,
-      .total_reordered_count = reordered_count_,
-      .window_reordered_count = window_reordered_count_,
-      .total_gap_count = gap_count_,
-      .window_gap_count = window_gap_count_,
-      .max_gap_ms = max_gap_ms_,
-  };
+  TimingSummary summary;
+  summary.total_count = count_;
+  summary.window_count = window_count_;
+  summary.last_delay_ms = last_delay_ms_;
+  summary.window_average_delay_ms = window_average_delay_ms;
+  summary.window_max_delay_ms = window_max_delay_ms_;
+  summary.last_period_ms = last_period_ms_;
+  summary.last_jitter_ms = last_jitter_ms_;
+  summary.window_max_jitter_ms = window_max_jitter_ms_;
+  summary.total_reordered_count = reordered_count_;
+  summary.window_reordered_count = window_reordered_count_;
+  summary.total_gap_count = gap_count_;
+  summary.window_gap_count = window_gap_count_;
+  summary.max_gap_ms = max_gap_ms_;
 
   return EvaluateHealth(std::move(summary));
 }
@@ -156,21 +154,20 @@ TimingSummary StreamTimingTracker::CurrentWindowSummary() const {
 TimingSummary StreamTimingTracker::ConsumeWindowSummary() {
   const double window_average_delay_ms = window_count_ > 0 ? window_delay_sum_ms_ / static_cast<double>(window_count_) : 0.0;
 
-  auto summary = TimingSummary{
-      .total_count = count_,
-      .window_count = window_count_,
-      .last_delay_ms = last_delay_ms_,
-      .window_average_delay_ms = window_average_delay_ms,
-      .window_max_delay_ms = window_max_delay_ms_,
-      .last_period_ms = last_period_ms_,
-      .last_jitter_ms = last_jitter_ms_,
-      .window_max_jitter_ms = window_max_jitter_ms_,
-      .total_reordered_count = reordered_count_,
-      .window_reordered_count = window_reordered_count_,
-      .total_gap_count = gap_count_,
-      .window_gap_count = window_gap_count_,
-      .max_gap_ms = max_gap_ms_,
-  };
+  TimingSummary summary;
+  summary.total_count = count_;
+  summary.window_count = window_count_;
+  summary.last_delay_ms = last_delay_ms_;
+  summary.window_average_delay_ms = window_average_delay_ms;
+  summary.window_max_delay_ms = window_max_delay_ms_;
+  summary.last_period_ms = last_period_ms_;
+  summary.last_jitter_ms = last_jitter_ms_;
+  summary.window_max_jitter_ms = window_max_jitter_ms_;
+  summary.total_reordered_count = reordered_count_;
+  summary.window_reordered_count = window_reordered_count_;
+  summary.total_gap_count = gap_count_;
+  summary.window_gap_count = window_gap_count_;
+  summary.max_gap_ms = max_gap_ms_;
 
   summary = EvaluateHealth(std::move(summary));
   ResetWindow();

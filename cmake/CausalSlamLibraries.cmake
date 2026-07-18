@@ -10,6 +10,7 @@ set(CAUSAL_SLAM_DOMAIN_SOURCES
   src/domain/sensors/pointcloud/point_cloud2_time_field_extractor.cc
 
   src/domain/sensors/imu/imu_coverage_analyzer.cc
+  src/domain/sensors/imu/imu_coverage_edge_tolerance.cc
   src/domain/sensors/imu/imu_sample_buffer.cc
 
   src/domain/diagnostics/temporal_diagnostics.cc

@@ -39,7 +39,10 @@ std::string ToReportString(const T& value) {
 }
 
 ReportMetric Metric(std::string name, std::string value) {
-  return ReportMetric{.name = std::move(name), .value = std::move(value)};
+  ReportMetric metric;
+  metric.name = std::move(name);
+  metric.value = std::move(value);
+  return metric;
 }
 
 ReportSection MakeSection(std::string id, std::string title, std::string empty_message = "none") {
@@ -362,11 +365,26 @@ ReportDocument TemporalReportBuilder::BuildStatisticsReport(const causal_slam::s
     const causal_slam::statistics::TemporalWindowStatistics* stats;
   };
 
-  const std::vector<WindowView> windows{
-      {.id = "last_10s", .title = "Last 10s", .stats = &snapshot.short_window},
-      {.id = "last_60s", .title = "Last 60s", .stats = &snapshot.medium_window},
-      {.id = "session", .title = "Session", .stats = &snapshot.session},
-  };
+  std::vector<WindowView> windows;
+  windows.reserve(3);
+
+  WindowView short_window;
+  short_window.id = "last_10s";
+  short_window.title = "Last 10s";
+  short_window.stats = &snapshot.short_window;
+  windows.push_back(short_window);
+
+  WindowView medium_window;
+  medium_window.id = "last_60s";
+  medium_window.title = "Last 60s";
+  medium_window.stats = &snapshot.medium_window;
+  windows.push_back(medium_window);
+
+  WindowView session_window;
+  session_window.id = "session";
+  session_window.title = "Session";
+  session_window.stats = &snapshot.session;
+  windows.push_back(session_window);
 
   document.sections.push_back(BuildCloudDecisionsSection(snapshot.cloud_decisions));
 

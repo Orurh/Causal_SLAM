@@ -7,11 +7,18 @@
 namespace causal_slam::telemetry {
 namespace {
 
+StreamStalenessConfig MakeConfig(bool enabled) {
+  StreamStalenessConfig config;
+  config.enabled = enabled;
+  config.max_staleness_ns = 500'000'000LL;
+  return config;
+}
+
+
 TEST(StreamStalenessAnalyzerTest, MissingStreamIsReportedAsMissing) {
-  StreamStalenessAnalyzer analyzer(TemporalStreamId::kLidar, StreamStalenessConfig{
-                                                                 .enabled = true,
-                                                                 .max_staleness_ns = 500'000'000LL,
-                                                             });
+  StreamStalenessAnalyzer analyzer(
+      TemporalStreamId::kLidar,
+      MakeConfig(true));
 
   const auto summary = analyzer.Analyze(std::nullopt, 1'000'000'000LL);
 
@@ -22,10 +29,9 @@ TEST(StreamStalenessAnalyzerTest, MissingStreamIsReportedAsMissing) {
 }
 
 TEST(StreamStalenessAnalyzerTest, FreshStreamIsReportedAsFresh) {
-  StreamStalenessAnalyzer analyzer(TemporalStreamId::kImu, StreamStalenessConfig{
-                                                               .enabled = true,
-                                                               .max_staleness_ns = 500'000'000LL,
-                                                           });
+  StreamStalenessAnalyzer analyzer(
+      TemporalStreamId::kImu,
+      MakeConfig(true));
 
   const auto summary = analyzer.Analyze(1'000'000'000LL, 1'200'000'000LL);
 
@@ -35,10 +41,9 @@ TEST(StreamStalenessAnalyzerTest, FreshStreamIsReportedAsFresh) {
 }
 
 TEST(StreamStalenessAnalyzerTest, StaleStreamIsReportedAsStale) {
-  StreamStalenessAnalyzer analyzer(TemporalStreamId::kLidar, StreamStalenessConfig{
-                                                                 .enabled = true,
-                                                                 .max_staleness_ns = 500'000'000LL,
-                                                             });
+  StreamStalenessAnalyzer analyzer(
+      TemporalStreamId::kLidar,
+      MakeConfig(true));
 
   const auto summary = analyzer.Analyze(1'000'000'000LL, 1'700'000'000LL);
 
@@ -47,10 +52,9 @@ TEST(StreamStalenessAnalyzerTest, StaleStreamIsReportedAsStale) {
 }
 
 TEST(StreamStalenessAnalyzerTest, DisabledAnalyzerTreatsStreamAsFresh) {
-  StreamStalenessAnalyzer analyzer(TemporalStreamId::kLidar, StreamStalenessConfig{
-                                                                 .enabled = false,
-                                                                 .max_staleness_ns = 500'000'000LL,
-                                                             });
+  StreamStalenessAnalyzer analyzer(
+      TemporalStreamId::kLidar,
+      MakeConfig(false));
 
   const auto summary = analyzer.Analyze(std::nullopt, 1'000'000'000LL);
 
@@ -60,10 +64,9 @@ TEST(StreamStalenessAnalyzerTest, DisabledAnalyzerTreatsStreamAsFresh) {
 }
 
 TEST(StreamStalenessAnalyzerTest, NegativeAgeIsClampedToZero) {
-  StreamStalenessAnalyzer analyzer(TemporalStreamId::kLidar, StreamStalenessConfig{
-                                                                 .enabled = true,
-                                                                 .max_staleness_ns = 500'000'000LL,
-                                                             });
+  StreamStalenessAnalyzer analyzer(
+      TemporalStreamId::kLidar,
+      MakeConfig(true));
 
   const auto summary = analyzer.Analyze(2'000'000'000LL, 1'000'000'000LL);
 

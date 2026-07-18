@@ -49,13 +49,13 @@ causal_slam::model::PointTimeDiagnostics BuildPointTimeDiagnostics(const causal_
 
 causal_slam::lidar::LidarScanWindowEstimate BuildPointTimeFieldEstimate(
     const causal_slam::pointcloud::PointCloud2TimeFieldExtraction& extraction) {
-  return causal_slam::lidar::LidarScanWindowEstimate{
-      .window = extraction.scan_window,
-      .duration_ms = causal_slam::core::NanosecondsToMilliseconds(extraction.scan_window.DurationNs()),
-      .source = causal_slam::lidar::LidarScanWindowSource::kPointTimeField,
-      .confidence = causal_slam::lidar::LidarScanWindowConfidence::kHigh,
-      .reason = extraction.reason,
-  };
+  causal_slam::lidar::LidarScanWindowEstimate estimate;
+  estimate.window = extraction.scan_window;
+  estimate.duration_ms = causal_slam::core::NanosecondsToMilliseconds(extraction.scan_window.DurationNs());
+  estimate.source = causal_slam::lidar::LidarScanWindowSource::kPointTimeField;
+  estimate.confidence = causal_slam::lidar::LidarScanWindowConfidence::kHigh;
+  estimate.reason = extraction.reason;
+  return estimate;
 }
 
 }  // namespace
@@ -73,14 +73,14 @@ TemporalMonitorPipeline::TemporalMonitorPipeline(TemporalMonitorPipelineConfig c
 }
 
 void TemporalMonitorPipeline::ObserveImu(const ImuPipelineInput& input) {
-  imu_timing_tracker_.Observe(causal_slam::telemetry::TimingSample{
-      .header_stamp_ns = input.header_stamp_ns,
-      .receive_time_ns = input.receive_time_ns,
-  });
+  causal_slam::telemetry::TimingSample timing_sample;
+  timing_sample.header_stamp_ns = input.header_stamp_ns;
+  timing_sample.receive_time_ns = input.receive_time_ns;
+  imu_timing_tracker_.Observe(timing_sample);
 
-  imu_sample_buffer_.Add(causal_slam::coverage::ImuSample{
-      .stamp_ns = input.header_stamp_ns,
-  });
+  causal_slam::coverage::ImuSample imu_sample;
+  imu_sample.stamp_ns = input.header_stamp_ns;
+  imu_sample_buffer_.Add(imu_sample);
 }
 
 void TemporalMonitorPipeline::ObserveLidar(const LidarPipelineInput& input) {
@@ -96,10 +96,10 @@ void TemporalMonitorPipeline::ObserveLidar(const LidarPipelineInput& input) {
     }
   }
 
-  lidar_timing_tracker_.Observe(causal_slam::telemetry::TimingSample{
-      .header_stamp_ns = input.header_stamp_ns,
-      .receive_time_ns = input.receive_time_ns,
-  });
+  causal_slam::telemetry::TimingSample timing_sample;
+  timing_sample.header_stamp_ns = input.header_stamp_ns;
+  timing_sample.receive_time_ns = input.receive_time_ns;
+  lidar_timing_tracker_.Observe(timing_sample);
 
   latest_lidar_scan_window_estimate_ = lidar_scan_window_estimator_.Estimate(input.header_stamp_ns);
 
@@ -145,17 +145,16 @@ void TemporalMonitorPipeline::ObserveCloudDecision(const causal_slam::statistics
 }
 
 causal_slam::diagnostics::TemporalDiagnosticSnapshot TemporalMonitorPipeline::BuildLatestDiagnosticSnapshot() const {
-  const causal_slam::model::TemporalObservation observation{
-      .has_lidar_scan = latest_lidar_scan_window_estimate_.has_value(),
-      .latest_lidar_header_stamp_ns = latest_lidar_header_stamp_ns_,
-      .latest_lidar_frame_id = latest_lidar_frame_id_,
-      .streams = BuildTimingDiagnostics(imu_timing_tracker_.CurrentWindowSummary(), lidar_timing_tracker_.CurrentWindowSummary()),
-      .imu_coverage = latest_imu_coverage_summary_,
-      .lidar_scan_window = latest_lidar_scan_window_estimate_,
-      .lidar_point_time = latest_lidar_point_time_diagnostics_,
-      .transform_ages = latest_transform_age_summaries_,
-      .imu_buffer_size = imu_sample_buffer_.Size(),
-  };
+  causal_slam::model::TemporalObservation observation;
+  observation.has_lidar_scan = latest_lidar_scan_window_estimate_.has_value();
+  observation.latest_lidar_header_stamp_ns = latest_lidar_header_stamp_ns_;
+  observation.latest_lidar_frame_id = latest_lidar_frame_id_;
+  observation.streams = BuildTimingDiagnostics(imu_timing_tracker_.CurrentWindowSummary(), lidar_timing_tracker_.CurrentWindowSummary());
+  observation.imu_coverage = latest_imu_coverage_summary_;
+  observation.lidar_scan_window = latest_lidar_scan_window_estimate_;
+  observation.lidar_point_time = latest_lidar_point_time_diagnostics_;
+  observation.transform_ages = latest_transform_age_summaries_;
+  observation.imu_buffer_size = imu_sample_buffer_.Size();
 
   const causal_slam::diagnostics::TemporalDiagnosticsBuilder diagnostics_builder;
   return diagnostics_builder.Build(observation);
@@ -167,17 +166,16 @@ TemporalMonitorPipelineSnapshot TemporalMonitorPipeline::BuildSnapshot(std::int6
 
   const auto streams = BuildTimingDiagnostics(imu_summary, lidar_summary);
 
-  const causal_slam::model::TemporalObservation observation{
-      .has_lidar_scan = latest_lidar_scan_window_estimate_.has_value(),
-      .latest_lidar_header_stamp_ns = latest_lidar_header_stamp_ns_,
-      .latest_lidar_frame_id = latest_lidar_frame_id_,
-      .streams = streams,
-      .imu_coverage = latest_imu_coverage_summary_,
-      .lidar_scan_window = latest_lidar_scan_window_estimate_,
-      .lidar_point_time = latest_lidar_point_time_diagnostics_,
-      .transform_ages = latest_transform_age_summaries_,
-      .imu_buffer_size = imu_sample_buffer_.Size(),
-  };
+  causal_slam::model::TemporalObservation observation;
+  observation.has_lidar_scan = latest_lidar_scan_window_estimate_.has_value();
+  observation.latest_lidar_header_stamp_ns = latest_lidar_header_stamp_ns_;
+  observation.latest_lidar_frame_id = latest_lidar_frame_id_;
+  observation.streams = streams;
+  observation.imu_coverage = latest_imu_coverage_summary_;
+  observation.lidar_scan_window = latest_lidar_scan_window_estimate_;
+  observation.lidar_point_time = latest_lidar_point_time_diagnostics_;
+  observation.transform_ages = latest_transform_age_summaries_;
+  observation.imu_buffer_size = imu_sample_buffer_.Size();
 
   const causal_slam::diagnostics::TemporalDiagnosticsBuilder diagnostics_builder;
   const auto diagnostic_snapshot = diagnostics_builder.Build(observation);
@@ -187,11 +185,11 @@ TemporalMonitorPipelineSnapshot TemporalMonitorPipeline::BuildSnapshot(std::int6
 
   temporal_statistics_.Observe(now_ns, diagnostic_snapshot.observation, diagnostic_snapshot.overall_status);
 
-  return TemporalMonitorPipelineSnapshot{
-      .diagnostics = diagnostic_snapshot,
-      .map_update_decision = causal_slam::policy::DecideMapUpdate(diagnostic_snapshot.overall_status, has_hard_fusion_blocker),
-      .statistics = temporal_statistics_.Snapshot(now_ns),
-  };
+  TemporalMonitorPipelineSnapshot snapshot;
+  snapshot.diagnostics = diagnostic_snapshot;
+  snapshot.map_update_decision = causal_slam::policy::DecideMapUpdate(diagnostic_snapshot.overall_status, has_hard_fusion_blocker);
+  snapshot.statistics = temporal_statistics_.Snapshot(now_ns);
+  return snapshot;
 }
 
 std::size_t TemporalMonitorPipeline::ImuBufferSize() const {

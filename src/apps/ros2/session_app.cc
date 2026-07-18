@@ -1,6 +1,8 @@
 #include "apps/ros2/session_app.h"
 
 #include "apps/ros2/bag_topic_inspector.h"
+#include "apps/ros2/custom_sensor_topic_classifier.h"
+#include "apps/ros2/point_cloud2_topic_classifier.h"
 #include "apps/ros2/session_cli.h"
 
 #include <cstdint>
@@ -39,6 +41,17 @@ struct RuntimeDiagnosticSummary {
 
 void PrintTopic(const BagTopicInfo& topic, std::ostream& out) {
   out << "  " << topic.name << " " << topic.type << " messages=" << topic.message_count << "\n";
+}
+
+void PrintPointCloud2Candidate(const BagTopicInfo& topic, std::ostream& out) {
+  out << "  " << topic.name << " " << topic.type << " messages=" << topic.message_count
+      << " classification=" << ToString(ClassifyPointCloud2TopicName(topic.name)) << "\n";
+}
+
+void PrintCustomSensorCandidate(const BagTopicInfo& topic, std::ostream& out) {
+  out << "  " << topic.name << " " << topic.type << " messages=" << topic.message_count
+      << " classification=" << ToString(ClassifyCustomSensorTopic(topic.name, topic.type)) << " support=not_supported_yet"
+      << "\n";
 }
 
 std::string JsonEscape(const std::string& value) {
@@ -106,15 +119,27 @@ int RunDiscover(const SessionOptions& options, std::ostream& out, std::ostream& 
     out << "Causal-SLAM session discovery\n";
     out << "Bag: " << inspection.bag_path << "\n\n";
 
-    out << "LiDAR candidates:\n";
-    bool has_lidar = false;
+    out << "PointCloud2 candidates:\n";
+    bool has_point_cloud2 = false;
     for (const auto& topic : inspection.topics) {
       if (topic.type == kPointCloud2Type) {
-        PrintTopic(topic, out);
-        has_lidar = true;
+        PrintPointCloud2Candidate(topic, out);
+        has_point_cloud2 = true;
       }
     }
-    if (!has_lidar) {
+    if (!has_point_cloud2) {
+      out << "  none\n";
+    }
+
+    out << "\nCustom sensor candidates:\n";
+    bool has_custom_sensor = false;
+    for (const auto& topic : inspection.topics) {
+      if (IsKnownCustomSensorType(topic.type)) {
+        PrintCustomSensorCandidate(topic, out);
+        has_custom_sensor = true;
+      }
+    }
+    if (!has_custom_sensor) {
       out << "  none\n";
     }
 
@@ -133,7 +158,7 @@ int RunDiscover(const SessionOptions& options, std::ostream& out, std::ostream& 
     out << "\nOther topics:\n";
     bool has_other = false;
     for (const auto& topic : inspection.topics) {
-      if (topic.type != kPointCloud2Type && topic.type != kImuType) {
+      if (topic.type != kPointCloud2Type && topic.type != kImuType && !IsKnownCustomSensorType(topic.type)) {
         PrintTopic(topic, out);
         has_other = true;
       }
@@ -335,6 +360,7 @@ bool WriteRunScripts(const std::filesystem::path& output_dir, const SessionOptio
   const auto run_bag_play = output_dir / "run_bag_play.sh";
   const auto record_diagnostics = output_dir / "record_diagnostics.sh";
   const auto summarize_diagnostics = output_dir / "summarize_diagnostics.sh";
+  const auto run_all_observe = output_dir / "run_all_observe.sh";
   const auto run_foxglove_bridge = output_dir / "run_foxglove_bridge.sh";
 
   const std::string temporal_monitor_script =
@@ -437,6 +463,195 @@ bool WriteRunScripts(const std::filesystem::path& output_dir, const SessionOptio
       "  --diagnostics-bag \"$1\" \\\n"
       "  --output-dir \"$SCRIPT_DIR\"\n";
 
+  const std::string run_all_observe_script = R"SH(#!/usr/bin/env bash
+set -eo pipefail
+
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-42}"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+MONITOR_PID=""
+RECORDER_PID=""
+PLAY_PID=""
+CLEANUP_STARTED=0
+
+STOP_INT_TIMEOUT_SEC="${CAUSAL_SLAM_STOP_INT_TIMEOUT_SEC:-1}"
+STOP_TERM_TIMEOUT_SEC="${CAUSAL_SLAM_STOP_TERM_TIMEOUT_SEC:-3}"
+STOP_KILL_TIMEOUT_SEC="${CAUSAL_SLAM_STOP_KILL_TIMEOUT_SEC:-2}"
+
+process_group_has_live_processes() {
+  local pgid="$1"
+
+  if [ -z "$pgid" ]; then
+    return 1
+  fi
+
+  LC_ALL=C ps -eo pgid=,stat= 2>/dev/null |
+    awk -v pgid="$pgid" '
+      $1 == pgid && $2 !~ /^Z/ {
+        found = 1
+      }
+      END {
+        exit(found ? 0 : 1)
+      }
+    '
+}
+
+wait_for_process_group_exit() {
+  local pgid="$1"
+  local timeout_sec="$2"
+  local deadline=$((SECONDS + timeout_sec))
+
+  while process_group_has_live_processes "$pgid"; do
+    if (( SECONDS >= deadline )); then
+      return 1
+    fi
+
+    sleep 0.1
+  done
+
+  return 0
+}
+
+stop_process_group() {
+  local name="$1"
+  local pgid="$2"
+
+  if [ -z "$pgid" ]; then
+    return 0
+  fi
+
+  if ! process_group_has_live_processes "$pgid"; then
+    wait "$pgid" 2>/dev/null || true
+    return 0
+  fi
+
+  echo "[causal_slam_session] Sending SIGINT to $name process group $pgid..."
+  kill -s INT -- "-$pgid" 2>/dev/null || true
+
+  if wait_for_process_group_exit "$pgid" "$STOP_INT_TIMEOUT_SEC"; then
+    wait "$pgid" 2>/dev/null || true
+    return 0
+  fi
+
+  echo "[causal_slam_session] $name did not stop after SIGINT; sending SIGTERM..." >&2
+  kill -s TERM -- "-$pgid" 2>/dev/null || true
+
+  if wait_for_process_group_exit "$pgid" "$STOP_TERM_TIMEOUT_SEC"; then
+    wait "$pgid" 2>/dev/null || true
+    return 0
+  fi
+
+  echo "[causal_slam_session] $name did not stop after SIGTERM; sending SIGKILL..." >&2
+  kill -s KILL -- "-$pgid" 2>/dev/null || true
+  wait_for_process_group_exit "$pgid" "$STOP_KILL_TIMEOUT_SEC" || true
+  wait "$pgid" 2>/dev/null || true
+}
+
+cleanup() {
+  local exit_code=$?
+
+  if [ "$CLEANUP_STARTED" -ne 0 ]; then
+    return "$exit_code"
+  fi
+
+  CLEANUP_STARTED=1
+  trap '' INT TERM
+
+  stop_process_group "bag player" "$PLAY_PID"
+  stop_process_group "diagnostics recorder" "$RECORDER_PID"
+  stop_process_group "temporal monitor" "$MONITOR_PID"
+
+  PLAY_PID=""
+  RECORDER_PID=""
+  MONITOR_PID=""
+
+  return "$exit_code"
+}
+
+handle_signal() {
+  local signal_name="$1"
+  local exit_code=130
+
+  if [ "$signal_name" = "TERM" ]; then
+    exit_code=143
+  fi
+
+  echo
+  echo "[causal_slam_session] Received SIG$signal_name; stopping child processes..." >&2
+  cleanup
+  exit "$exit_code"
+}
+
+trap cleanup EXIT
+trap 'handle_signal INT' INT
+trap 'handle_signal TERM' TERM
+
+if ! command -v setsid >/dev/null 2>&1; then
+  echo "[causal_slam_session] Required command not found: setsid" >&2
+  exit 4
+fi
+
+echo "[causal_slam_session] ROS_DOMAIN_ID=$ROS_DOMAIN_ID"
+echo "[causal_slam_session] Starting temporal monitor..."
+setsid ./run_temporal_monitor.sh </dev/null &
+MONITOR_PID="$!"
+
+sleep "${CAUSAL_SLAM_MONITOR_STARTUP_DELAY_SEC:-2}"
+
+echo "[causal_slam_session] Starting diagnostic recorder..."
+setsid ./record_diagnostics.sh </dev/null &
+RECORDER_PID="$!"
+
+sleep "${CAUSAL_SLAM_RECORDER_STARTUP_DELAY_SEC:-2}"
+
+echo "[causal_slam_session] Playing source bag..."
+setsid ./run_bag_play.sh </dev/null &
+PLAY_PID="$!"
+
+if wait "$PLAY_PID"; then
+  PLAY_EXIT=0
+else
+  PLAY_EXIT="$?"
+fi
+
+PLAY_PID=""
+
+echo "[causal_slam_session] Stopping recorder and monitor..."
+stop_process_group "diagnostics recorder" "$RECORDER_PID"
+RECORDER_PID=""
+
+stop_process_group "temporal monitor" "$MONITOR_PID"
+MONITOR_PID=""
+
+trap - EXIT INT TERM
+
+if [ "$PLAY_EXIT" -ne 0 ]; then
+  echo "[causal_slam_session] Bag playback failed with exit code $PLAY_EXIT" >&2
+  exit "$PLAY_EXIT"
+fi
+
+DIAG_BAG="$(find "$SCRIPT_DIR" -maxdepth 1 -type d -name 'runtime_diagnostics_*' -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2-)"
+
+if [ -z "$DIAG_BAG" ]; then
+  echo "[causal_slam_session] No runtime_diagnostics_* bag was produced." >&2
+  exit 3
+fi
+
+echo "[causal_slam_session] Summarizing diagnostics bag:"
+echo "  $DIAG_BAG"
+./summarize_diagnostics.sh "$DIAG_BAG"
+
+echo
+echo "[causal_slam_session] Done."
+echo "Summary files:"
+echo "  $SCRIPT_DIR/diagnostic_summary.txt"
+echo "  $SCRIPT_DIR/diagnostic_summary.json"
+echo "  $SCRIPT_DIR/diagnostic_timeline.csv"
+echo "  $SCRIPT_DIR/map_update_decision_json.jsonl"
+)SH";
+
   const std::string foxglove_script =
       "#!/usr/bin/env bash\n"
       "set -eo pipefail\n"
@@ -461,6 +676,7 @@ bool WriteRunScripts(const std::filesystem::path& output_dir, const SessionOptio
          WriteExecutableScript(run_bag_play, bag_play_script, err) &&
          WriteExecutableScript(record_diagnostics, record_diagnostics_script, err) &&
          WriteExecutableScript(summarize_diagnostics, summarize_diagnostics_script, err) &&
+         WriteExecutableScript(run_all_observe, run_all_observe_script, err) &&
          WriteExecutableScript(run_foxglove_bridge, foxglove_script, err);
 }
 
@@ -611,23 +827,29 @@ bool WriteGeneratedReadme(const std::filesystem::path& path, const SessionOption
        << "checked_lidar_topic: " << options.checked_lidar_topic << "\n"
        << "play_rate: " << options.play_rate << "\n"
        << "```\n\n"
-       << "## Run order\n\n"
+       << "## Quick run\n\n"
+       << "Use the generated one-command observe workflow first.\n\n"
+       << "```bash\n"
+       << "cd " << options.output_dir << "\n"
+       << "./run_all_observe.sh\n"
+       << "```\n\n"
+       << "## Manual run order\n\n"
        << "Use the same `ROS_DOMAIN_ID` in all terminals.\n\n"
        << "### Terminal 1: temporal monitor\n\n"
        << "```bash\n"
        << "cd " << options.output_dir << "\n"
-       << "ROS_DOMAIN_ID=151 ./run_temporal_monitor.sh\n"
+       << "ROS_DOMAIN_ID=42 ./run_temporal_monitor.sh\n"
        << "```\n\n"
        << "### Terminal 2: diagnostics recorder\n\n"
        << "```bash\n"
        << "cd " << options.output_dir << "\n"
-       << "ROS_DOMAIN_ID=151 ./record_diagnostics.sh\n"
+       << "ROS_DOMAIN_ID=42 ./record_diagnostics.sh\n"
        << "```\n\n"
        << "Stop this terminal with `Ctrl+C` after bag playback finishes.\n\n"
        << "### Terminal 3: bag playback\n\n"
        << "```bash\n"
        << "cd " << options.output_dir << "\n"
-       << "ROS_DOMAIN_ID=151 ./run_bag_play.sh\n"
+       << "ROS_DOMAIN_ID=42 ./run_bag_play.sh\n"
        << "```\n\n"
        << "## Summarize diagnostics\n\n"
        << "```bash\n"
@@ -671,6 +893,7 @@ bool WriteGeneratedReadme(const std::filesystem::path& path, const SessionOption
        << "- `record_diagnostics.sh` — records only diagnostic topics\n"
        << "- `run_bag_play.sh` — plays the source rosbag2 dataset\n"
        << "- `summarize_diagnostics.sh` — builds text/JSON/CSV summaries from a diagnostics bag\n"
+       << "- `run_all_observe.sh` — runs monitor, recorder, bag playback, shutdown, and summary in one command\n"
        << "- `run_foxglove_bridge.sh` — optional Foxglove bridge\n";
 
   return true;
@@ -716,11 +939,12 @@ int RunInit(const SessionOptions& options, std::ostream& out, std::ostream& err)
         << "  " << output_dir / "run_bag_play.sh" << "\n"
         << "  " << output_dir / "record_diagnostics.sh" << "\n"
         << "  " << output_dir / "summarize_diagnostics.sh" << "\n"
+        << "  " << output_dir / "run_all_observe.sh" << "\n"
         << "  " << output_dir / "run_foxglove_bridge.sh" << "\n"
         << "\n"
         << "Next:\n"
         << "  cd " << output_dir << "\n"
-        << "  ROS_DOMAIN_ID=42 ./run_temporal_monitor.sh\n";
+        << "  ROS_DOMAIN_ID=42 ./run_all_observe.sh\n";
 
     return 0;
   } catch (const std::exception& e) {

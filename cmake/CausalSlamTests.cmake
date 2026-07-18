@@ -65,6 +65,24 @@ causal_slam_add_gtests_from_dir(
     tf2_ros
 )
 
+ament_add_gtest(point_cloud2_topic_classifier_test
+  tests/nodes/point_cloud2_topic_classifier_test.cc
+  src/apps/ros2/point_cloud2_topic_classifier.cc
+)
+
+if(TARGET point_cloud2_topic_classifier_test)
+  causal_slam_target_include_src(point_cloud2_topic_classifier_test)
+endif()
+
+ament_add_gtest(custom_sensor_topic_classifier_test
+  tests/nodes/custom_sensor_topic_classifier_test.cc
+  src/apps/ros2/custom_sensor_topic_classifier.cc
+)
+
+if(TARGET custom_sensor_topic_classifier_test)
+  causal_slam_target_include_src(custom_sensor_topic_classifier_test)
+endif()
+
 add_test(
   NAME config_parameter_drift_test
   COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_config_params.py

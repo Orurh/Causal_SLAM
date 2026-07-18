@@ -27,6 +27,7 @@
 
 #include "adapters/ros2/point_cloud2_conversions.h"
 #include "domain/sensors/imu/imu_coverage_analyzer.h"
+#include "domain/sensors/imu/imu_coverage_edge_tolerance.h"
 #include "domain/sensors/lidar/lidar_scan_window_estimator.h"
 #include "domain/time/time_units.h"
 #include "presentation/render/offline_temporal_report_artifact_writer.h"
@@ -150,6 +151,35 @@ PointCloudCapabilitySummary AnalyzePointCloudCapabilities(const std::vector<Poin
   }
 
   return result;
+}
+
+std::optional<double> ObservedImuPeriodP95Ms(const std::vector<causal_slam::coverage::ImuSample>& imu_samples) {
+  if (imu_samples.size() < 2) {
+    return std::nullopt;
+  }
+
+  std::vector<double> positive_periods_ms;
+  positive_periods_ms.reserve(imu_samples.size() - 1);
+
+  for (std::size_t index = 1; index < imu_samples.size(); ++index) {
+    const std::int64_t period_ns = imu_samples[index].stamp_ns - imu_samples[index - 1].stamp_ns;
+
+    if (period_ns <= 0) {
+      continue;
+    }
+
+    positive_periods_ms.push_back(NsToMs(period_ns));
+  }
+
+  if (positive_periods_ms.empty()) {
+    return std::nullopt;
+  }
+
+  std::sort(positive_periods_ms.begin(), positive_periods_ms.end());
+
+  const std::size_t nearest_rank_index = static_cast<std::size_t>(std::ceil(0.95 * static_cast<double>(positive_periods_ms.size()))) - 1;
+
+  return positive_periods_ms[std::min(nearest_rank_index, positive_periods_ms.size() - 1)];
 }
 
 class TimingAccumulator {
@@ -317,13 +347,13 @@ std::vector<PointFieldSummary> SummarizeFields(const sensor_msgs::msg::PointClou
   fields.reserve(cloud.fields.size());
 
   for (const auto& field : cloud.fields) {
-    fields.push_back(PointFieldSummary{
-        .name = field.name,
-        .offset = field.offset,
-        .datatype = field.datatype,
-        .count = field.count,
-        .datatype_name = PointFieldDatatypeName(field.datatype),
-    });
+    PointFieldSummary field_summary;
+    field_summary.name = field.name;
+    field_summary.offset = field.offset;
+    field_summary.datatype = field.datatype;
+    field_summary.count = field.count;
+    field_summary.datatype_name = PointFieldDatatypeName(field.datatype);
+    fields.push_back(field_summary);
   }
 
   return fields;
@@ -363,16 +393,33 @@ OfflineImuCoverageReport BuildOfflineImuCoverageReport(const std::vector<causal_
   OfflineImuCoverageReport report;
   report.scans_total = scan_windows.size();
 
+  constexpr double kConfiguredMinEdgeToleranceMs = 12.5;
+  constexpr double kObservedPeriodMultiplier = 1.5;
+
+  const std::optional<double> observed_period_p95_ms = ObservedImuPeriodP95Ms(imu_samples);
+
+  causal_slam::coverage::ImuCoverageEdgeToleranceConfig edge_tolerance_config;
+  edge_tolerance_config.configured_min_tolerance_ms = kConfiguredMinEdgeToleranceMs;
+  edge_tolerance_config.observed_period_multiplier = kObservedPeriodMultiplier;
+
+  const auto edge_tolerance = causal_slam::coverage::ResolveImuCoverageEdgeTolerance(edge_tolerance_config, observed_period_p95_ms);
+
+  report.has_observed_imu_period_p95 = observed_period_p95_ms.has_value();
+  report.observed_imu_period_p95_ms = observed_period_p95_ms.value_or(0.0);
+  report.configured_min_edge_tolerance_ms = edge_tolerance.configured_min_tolerance_ms;
+  report.adaptive_edge_tolerance_ms = edge_tolerance.adaptive_tolerance_ms;
+  report.effective_edge_tolerance_ms = edge_tolerance.effective_tolerance_ms;
+  report.edge_tolerance_source = causal_slam::coverage::ToString(edge_tolerance.source);
+
   if (scan_windows.empty()) {
     report.worst_reason = "no_scan_windows";
     return report;
   }
 
-  const auto coverage_config = causal_slam::coverage::ImuCoverageConfig{
-      .max_missing_prefix_ms = 12.5,
-      .max_missing_suffix_ms = 12.5,
-      .max_internal_gap_ms = 30.0,
-  };
+  causal_slam::coverage::ImuCoverageConfig coverage_config;
+  coverage_config.max_missing_prefix_ms = edge_tolerance.effective_tolerance_ms;
+  coverage_config.max_missing_suffix_ms = edge_tolerance.effective_tolerance_ms;
+  coverage_config.max_internal_gap_ms = 30.0;
   causal_slam::coverage::ImuCoverageAnalyzer analyzer{coverage_config};
 
   std::uint64_t imu_count_sum = 0;
@@ -584,13 +631,14 @@ int AnalyzeBag(const AnalyzeBagOptions& options, std::ostream& out, std::ostream
     TimingAccumulator lidar_timing;
     LidarScanWindowAccumulator lidar_scan_windows;
 
-    causal_slam::lidar::LidarScanWindowEstimator fallback_scan_window_estimator{causal_slam::lidar::LidarScanWindowEstimatorConfig{
-        .fallback_scan_duration_ms = 100.0,
-        .min_measured_scan_duration_ms = 1.0,
-        .max_measured_scan_duration_ms = 500.0,
-        .stamp_policy = causal_slam::lidar::LidarStampPolicy::kScanEnd,
-        .prefer_measured_header_period = true,
-    }};
+    causal_slam::lidar::LidarScanWindowEstimatorConfig fallback_scan_window_config;
+    fallback_scan_window_config.fallback_scan_duration_ms = 100.0;
+    fallback_scan_window_config.min_measured_scan_duration_ms = 1.0;
+    fallback_scan_window_config.max_measured_scan_duration_ms = 500.0;
+    fallback_scan_window_config.stamp_policy = causal_slam::lidar::LidarStampPolicy::kScanEnd;
+    fallback_scan_window_config.prefer_measured_header_period = true;
+
+    causal_slam::lidar::LidarScanWindowEstimator fallback_scan_window_estimator{fallback_scan_window_config};
 
     causal_slam::pointcloud::PointCloud2TimeFieldExtractor time_field_extractor;
 
@@ -613,7 +661,9 @@ int AnalyzeBag(const AnalyzeBagOptions& options, std::ostream& out, std::ostream
 
           const auto stamp_ns = ToNanoseconds(imu_message.header.stamp);
           imu_timing.Observe(stamp_ns);
-          imu_samples.push_back(causal_slam::coverage::ImuSample{.stamp_ns = stamp_ns});
+          causal_slam::coverage::ImuSample imu_sample;
+          imu_sample.stamp_ns = stamp_ns;
+          imu_samples.push_back(imu_sample);
         } catch (const std::exception&) {
           imu_timing.ObserveFailure();
         }
@@ -684,26 +734,23 @@ int AnalyzeBag(const AnalyzeBagOptions& options, std::ostream& out, std::ostream
     summary.verdict = BuildDatasetVerdict(summary);
 
     const causal_slam::render::OfflineTemporalReportArtifactWriter artifact_writer;
-    const causal_slam::render::OfflineTemporalReportArtifactPaths artifact_paths{
-        .json_report_path = options.report_path,
-        .html_report_path = options.html_report_path,
-    };
-    const causal_slam::render::OfflineTemporalReportArtifactContext artifact_context{
-        .bag_path = options.bag_path,
-        .lidar_topic = options.lidar_topic,
-        .imu_topic = options.imu_topic,
-    };
+    causal_slam::render::OfflineTemporalReportArtifactPaths artifact_paths;
+    artifact_paths.json_report_path = options.report_path;
+    artifact_paths.html_report_path = options.html_report_path;
+    causal_slam::render::OfflineTemporalReportArtifactContext artifact_context;
+    artifact_context.bag_path = options.bag_path;
+    artifact_context.lidar_topic = options.lidar_topic;
+    artifact_context.imu_topic = options.imu_topic;
     if (!artifact_writer.Write(artifact_paths, artifact_context, summary, err)) {
       return 3;
     }
 
     const causal_slam::render::OfflineTemporalReportConsoleRenderer console_renderer;
-    const causal_slam::render::OfflineTemporalReportConsoleRenderContext console_context{
-        .bag_path = options.bag_path,
-        .report_path = options.report_path,
-        .lidar_topic = options.lidar_topic,
-        .imu_topic = options.imu_topic,
-    };
+    causal_slam::render::OfflineTemporalReportConsoleRenderContext console_context;
+    console_context.bag_path = options.bag_path;
+    console_context.report_path = options.report_path;
+    console_context.lidar_topic = options.lidar_topic;
+    console_context.imu_topic = options.imu_topic;
     out << console_renderer.Render(console_context, summary);
     return 0;
   } catch (const std::exception& e) {
